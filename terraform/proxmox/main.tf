@@ -9,8 +9,8 @@ terraform {
 }
 
 provider "proxmox" {
-  endpoint = var.proxmox_endpoint
-  api_token = var.proxmox_api_token
+  endpoint = "https://${var.proxmox_host}:8006"
+  api_token = "${var.api_user}!${var.api_token_name}=${var.api_token_value}"
   insecure  = var.proxmox_insecure
   
   ssh {
@@ -20,19 +20,25 @@ provider "proxmox" {
 }
 
 locals {
-  basename = "wug-sync"
+  basename = "wug-infoblox-sync"
 }
 
 # Render cloud-init template to local file
 resource "local_file" "wug_sync_userdata" {
   content = templatefile("${path.module}/cloud-init.yml", {
-    hostname        = local.basename
-    dns_zone        = var.dns_zone
-    ip_address      = var.vm_ip_address
-    gateway         = var.gateway
-    subnet_bits     = var.subnet_bits
-    dns_servers     = join(",", var.dns_servers)
-    ssh_public_key  = trimspace(file(var.ssh_public_key_file))
+    hostname            = local.basename
+    dns_zone            = var.dns_zone
+    ip_address          = var.vm_ip_address
+    gateway             = var.gateway
+    subnet_bits         = var.subnet_bits
+    dns_servers         = join(",", var.dns_servers)
+    ssh_public_key      = trimspace(file(var.ssh_public_key_file))
+    wug_base_url        = var.wug_base_url
+    wug_username        = var.wug_username
+    wug_password        = var.wug_password
+    infoblox_base_url   = var.infoblox_base_url
+    infoblox_username   = var.infoblox_username
+    infoblox_password   = var.infoblox_password
   })
   filename = "${path.root}/tmp/wug-sync-userdata.yml"
 }
@@ -139,5 +145,5 @@ output "vm_name" {
 
 output "ssh_command" {
   value       = "ssh ${var.vm_user}@${var.vm_ip_address}"
-  description = "SSH command to connect to the VM (password: ${var.vm_password})"
+  description = "SSH command to connect to the VM"
 }

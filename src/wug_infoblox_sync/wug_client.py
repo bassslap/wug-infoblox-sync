@@ -47,54 +47,102 @@ class WUGClient:
         return token
 
     def get_devices(self, limit: int | None = None) -> list[WUGDevice]:
+        """
+        Get devices from WUG by iterating through device groups.
+        Uses /device-groups/- endpoint followed by /device-groups/{groupId}/devices
+        """
         token = self._token()
         headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/json",
         }
-        endpoint = f"{self.settings.wug_base_url.rstrip('/')}{self.settings.wug_devices_endpoint}"
-        params: dict[str, Any] = {"pageSize": self.settings.wug_page_size}
-        if limit:
-            params["pageSize"] = min(limit, self.settings.wug_page_size)
-
-        response = self.session.get(
-            endpoint,
+        
+        # First get all device groups
+        base_url = self.settings.wug_base_url.rstrip('/')
+        groups_endpoint = f"{base_url}/api/v1/device-groups/-"
+        
+        groups_response = self.session.get(
+            groups_endpoint,
             headers=headers,
-            params=params,
             timeout=self.settings.sync_timeout_seconds,
             verify=self.settings.sync_verify_ssl,
         )
-        response.raise_for_status()
-        payload = response.json()
-
-        items = payload.get("data") if isinstance(payload, dict) else payload
-        if not isinstance(items, list):
+        groups_response.raise_for_status()
+        groups_data = groups_response.json()
+        
+        if not isinstance(groups_data, dict) or 'data' not in groups_data:
             return []
-
-        devices: list[WUGDevice] = []
-        for item in items:
-            if not isinstance(item, dict):
+        
+        groups = groups_data['data'].get('groups', [])
+        
+        # Get devices from each group
+        all_devices: list[WUGDevice] = []
+        seen_device_ids = set()
+        
+        for group in groups:
+            group_id = group.get('id')
+            group_name = group.get('name', 'Unknown')
+            
+            if not group_id:
                 continue
-            device_id = str(item.get("id") or item.get("deviceId") or "")
-            hostname = str(item.get("displayName") or item.get("name") or "")
-            ip = str(
-                item.get("networkAddress")
-                or item.get("ipAddress")
-                or item.get("primaryAddress")
-                or ""
-            )
-            status = str(item.get("state") or item.get("status") or "unknown")
-            if not device_id or not ip:
-                continue
-            devices.append(
-                WUGDevice(
-                    source_id=device_id,
-                    hostname=hostname or f"wug-{device_id}",
-                    ip_address=ip,
-                    status=status,
-                    raw=item,
+            
+            try:
+                devices_endpoint = f"{base_url}/api/v1/device-groups/{group_id}/devices"
+                devices_response = self.session.get(
+                    devices_endpoint,
+                    headers=headers,
+                    timeout=self.settings.sync_timeout_seconds,
+                    verify=self.settings.sync_verify_ssl,
                 )
-            )
-            if limit and len(devices) >= limit:
-                break
-        return devices
+                devices_response.raise_for_status()
+                devices_data = devices_response.json()
+                
+                if isinstance(devices_data, dict) and 'data' in devices_data:
+                    devices = devices_data['data'].get('devices', [])
+                    
+                    for item in devices:
+                        if not isinstance(item, dict):
+                            continue
+                        
+                        device_id = str(item.get("id") or item.get("deviceId") or "")
+                        
+                        # Skip duplicates
+                        if device_id in seen_device_ids:
+                            continue
+                        
+                        hostname = str(item.get("displayName") or item.get("hostName") or item.get("name") or "")
+                        ip = str(
+                            item.get("networkAddress")
+                            or item.get("ipAddress")
+                            or item.get("primaryAddress")
+                            or ""
+                        )
+                        status = str(item.get("bestState") or item.get("state") or item.get("status") or "unknown")
+                        
+                        if not device_id or not ip:
+                            continue
+                        
+                        # Add group information to raw data
+                        item['group_id'] = group_id
+                        item['group_name'] = group_name
+                        
+                        all_devices.append(
+                            WUGDevice(
+                                source_id=device_id,
+                                hostname=hostname or f"wug-{device_id}",
+                                ip_address=ip,
+                                status=status,
+                                raw=item,
+                            )
+                        )
+                        seen_device_ids.add(device_id)
+                        
+                        if limit and len(all_devices) >= limit:
+                            return all_devices
+            
+            except Exception as e:
+                # Log warning but continue with other groups
+                print(f"Warning: Failed to get devices from group {group_name}: {e}")
+                continue
+        
+        return all_devices

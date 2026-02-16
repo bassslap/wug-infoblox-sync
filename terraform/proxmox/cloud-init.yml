@@ -55,6 +55,11 @@ write_files:
               addresses:
                 - ${dns_servers}
     permissions: '0644'
+  - path: /etc/hosts.append
+    content: |
+      10.100.0.11 wug.local
+      10.100.0.14 infoblox.local
+    permissions: '0644'
   - path: /etc/systemd/system/wug-infoblox-sync.service
     permissions: '0644'
     content: |
@@ -74,6 +79,26 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
+  - path: /opt/wug-infoblox-sync.env
+    permissions: '0600'
+    content: |
+      FLASK_HOST=0.0.0.0
+      FLASK_PORT=8080
+      SYNC_TIMEOUT_SECONDS=30
+      SYNC_VERIFY_SSL=false
+      SYNC_LOG_LEVEL=INFO
+      
+      WUG_BASE_URL=${wug_base_url}
+      WUG_USERNAME=${wug_username}
+      WUG_PASSWORD=${wug_password}
+      WUG_TOKEN_ENDPOINT=/api/v1/token
+      
+      INFOBLOX_BASE_URL=${infoblox_base_url}
+      INFOBLOX_WAPI_VERSION=v2.12.3
+      INFOBLOX_USERNAME=${infoblox_username}
+      INFOBLOX_PASSWORD=${infoblox_password}
+      INFOBLOX_NETWORK_VIEW=default
+      INFOBLOX_DRY_RUN=true
 
 # Update packages
 package_update: true
@@ -103,6 +128,8 @@ runcmd:
   # Network setup
   - netplan apply
   - systemctl restart systemd-networkd
+  # Add custom hosts entries
+  - cat /etc/hosts.append >> /etc/hosts
   # User setup - multiple attempts for reliability
   - echo 'ubuntu:ubuntu123!' | chpasswd
   - passwd -u ubuntu
@@ -125,16 +152,19 @@ runcmd:
   - python3 -m venv .venv
   - /opt/wug-infoblox-sync/.venv/bin/pip install --upgrade pip
   - /opt/wug-infoblox-sync/.venv/bin/pip install -e .
-  - cp .env.example .env
+  # Move pre-configured .env into place
+  - mv /opt/wug-infoblox-sync.env /opt/wug-infoblox-sync/.env
   - chown -R ubuntu:ubuntu /opt/wug-infoblox-sync
-  # Enable service (but don't start until .env is configured)
+  - chmod 600 /opt/wug-infoblox-sync/.env
+  # Enable and start service
   - systemctl daemon-reload
   - systemctl enable wug-infoblox-sync.service
+  - systemctl start wug-infoblox-sync.service
   # Debug logging
   - echo "WUG-Infoblox sync setup completed at $(date)" >> /var/log/setup-debug.log
   - id ubuntu >> /var/log/setup-debug.log
   - grep ubuntu /etc/passwd >> /var/log/setup-debug.log
-  - systemctl status ssh >> /var/log/setup-debug.log
+  - systemctl status wug-infoblox-sync >> /var/log/setup-debug.log
 
 # SSH configuration
 ssh_deletekeys: false
@@ -145,4 +175,4 @@ disable_root: false
 ssh_authorize_keys: true
 
 # Final message
-final_message: "***HEY-YOU!*** WUG-Infoblox Sync VM ready. Login: ubuntu/ubuntu123! Configure /opt/wug-infoblox-sync/.env and start service."
+final_message: "***HEY-YOU!*** WUG-Infoblox Sync VM ready at ${ip_address}:8080. Login: ubuntu/ubuntu123! Service auto-started."

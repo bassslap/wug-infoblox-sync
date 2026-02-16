@@ -30,3 +30,13 @@ ssh_public_key_file = "~/.ssh/id_rsa.pub"
 
 # Tags
 tags = ["wug-sync", "automation", "infoblox"]
+
+# WUG API credentials
+wug_base_url  = "https://wug.example.com:9644"
+wug_username  = "api_user"
+wug_password  = "change-me"
+
+# Infoblox API credentials
+infoblox_base_url  = "https://infoblox.example.com"
+infoblox_username  = "admin"
+infoblox_password  = "change-me"

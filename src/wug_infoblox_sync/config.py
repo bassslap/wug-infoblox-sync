@@ -13,8 +13,6 @@ class Settings:
     wug_username: str
     wug_password: str
     wug_token_endpoint: str
-    wug_devices_endpoint: str
-    wug_page_size: int
     infoblox_base_url: str
     infoblox_wapi_version: str
     infoblox_username: str
@@ -40,8 +38,6 @@ def load_settings() -> Settings:
         wug_username=os.getenv("WUG_USERNAME", ""),
         wug_password=os.getenv("WUG_PASSWORD", ""),
         wug_token_endpoint=os.getenv("WUG_TOKEN_ENDPOINT", "/api/v1/token"),
-        wug_devices_endpoint=os.getenv("WUG_DEVICES_ENDPOINT", "/api/v1/devices/-"),
-        wug_page_size=int(os.getenv("WUG_PAGE_SIZE", "500")),
         infoblox_base_url=os.getenv("INFOBLOX_BASE_URL", ""),
         infoblox_wapi_version=os.getenv("INFOBLOX_WAPI_VERSION", "v2.12.3"),
         infoblox_username=os.getenv("INFOBLOX_USERNAME", ""),

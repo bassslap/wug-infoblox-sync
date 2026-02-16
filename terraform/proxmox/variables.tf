@@ -1,11 +1,21 @@
-# Proxmox connection
-variable "proxmox_endpoint" {
-  description = "Proxmox API endpoint (e.g., https://proxmox.example.com:8006)"
+# Proxmox connection - BPG provider individual variables
+variable "proxmox_host" {
+  description = "Proxmox host IP or hostname"
   type        = string
 }
 
-variable "proxmox_api_token" {
-  description = "Proxmox API token (format: user@realm!tokenid=secret)"
+variable "api_user" {
+  description = "Proxmox API user (e.g., terraform@pve)"
+  type        = string
+}
+
+variable "api_token_name" {
+  description = "Proxmox API token name"
+  type        = string
+}
+
+variable "api_token_value" {
+  description = "Proxmox API token value (UUID)"
   type        = string
   sensitive   = true
 }
@@ -20,11 +30,6 @@ variable "proxmox_ssh_user" {
   description = "SSH user for Proxmox host (for snippet upload)"
   type        = string
   default     = "root"
-}
-
-variable "proxmox_host" {
-  description = "Proxmox host IP or hostname for SCP operations"
-  type        = string
 }
 
 # VM configuration
@@ -130,4 +135,40 @@ variable "tags" {
   description = "List of tags for the VM"
   type        = list(string)
   default     = ["wug-sync", "automation"]
+}
+
+# WUG API credentials
+variable "wug_base_url" {
+  description = "WhatsUp Gold API base URL (e.g., https://wug.example.com:9644)"
+  type        = string
+}
+
+variable "wug_username" {
+  description = "WhatsUp Gold API username"
+  type        = string
+  sensitive   = true
+}
+
+variable "wug_password" {
+  description = "WhatsUp Gold API password"
+  type        = string
+  sensitive   = true
+}
+
+# Infoblox API credentials
+variable "infoblox_base_url" {
+  description = "Infoblox WAPI base URL (e.g., https://infoblox.example.com)"
+  type        = string
+}
+
+variable "infoblox_username" {
+  description = "Infoblox API username"
+  type        = string
+  sensitive   = true
+}
+
+variable "infoblox_password" {
+  description = "Infoblox API password"
+  type        = string
+  sensitive   = true
 }
