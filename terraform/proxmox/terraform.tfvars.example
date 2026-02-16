@@ -1,6 +1,32 @@
-infoblox_server   = "10.100.0.14"
-infoblox_username = "admin"
-infoblox_password = "admin123!"
-network_view      = "default"
-cidr              = "10.100.0.0/14"
-fqdn              = "infoblox.local"
+# Proxmox connection
+proxmox_endpoint   = "https://proxmox.example.com:8006"
+proxmox_api_token  = "root@pam!terraform=your-api-token-secret"
+proxmox_insecure   = true
+proxmox_ssh_user   = "root"
+proxmox_host       = "proxmox.example.com"
+
+# VM configuration
+vm_id       = 500
+node_name   = "pve"
+template_id = 9000
+vm_cores    = 2
+vm_memory   = 2048
+disk_size_gb = 20
+storage_pool = "local-lvm"
+
+# Network configuration
+network_bridge  = "vmbr0"
+vlan_tag        = 0
+vm_ip_address   = "10.0.0.50"
+subnet_bits     = 24
+gateway         = "10.0.0.1"
+dns_servers     = ["8.8.8.8", "8.8.4.4"]
+dns_zone        = "lab.local"
+
+# VM credentials
+vm_user             = "ubuntu"
+vm_password         = "ubuntu123!"
+ssh_public_key_file = "~/.ssh/id_rsa.pub"
+
+# Tags
+tags = ["wug-sync", "automation", "infoblox"]

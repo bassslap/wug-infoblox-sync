@@ -6,3 +6,5 @@ __pycache__/
 .tofu/
 .terraform/
 .terraform.lock.hcl
+terraform/proxmox/tmp/
+terraform/proxmox/terraform.tfvars

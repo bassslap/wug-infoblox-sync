@@ -1,0 +1,148 @@
+#cloud-config
+hostname: ${hostname}
+fqdn: ${hostname}.${dns_zone}
+
+# System configuration for default user
+system_info:
+  default_user:
+    name: ubuntu
+    plain_text_passwd: ubuntu123!
+    lock_passwd: false
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+
+# User configuration
+users:
+  - name: ubuntu
+    plain_text_passwd: ubuntu123!
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    home: /home/ubuntu
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+# Enable password authentication
+ssh_pwauth: true
+
+# Set password using multiple methods for reliability
+chpasswd:
+  expire: false
+  users:
+    - name: ubuntu
+      password: ubuntu123!
+      type: text
+
+# Network configuration for static IP
+write_files:
+  - path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    content: |
+      network: {config: disabled}
+    permissions: '0644'
+  - path: /etc/netplan/99-netcfg.yaml
+    content: |
+      network:
+        version: 2
+        ethernets:
+          eth0:
+            dhcp4: false
+            addresses:
+              - ${ip_address}/${subnet_bits}
+            routes:
+              - to: default
+                via: ${gateway}
+            nameservers:
+              addresses:
+                - ${dns_servers}
+    permissions: '0644'
+  - path: /etc/systemd/system/wug-infoblox-sync.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=WhatsUp Gold to Infoblox Sync Service
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=ubuntu
+      WorkingDirectory=/opt/wug-infoblox-sync
+      Environment="PATH=/opt/wug-infoblox-sync/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+      ExecStart=/opt/wug-infoblox-sync/.venv/bin/python -m wug_infoblox_sync.app
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+# Update packages
+package_update: true
+package_upgrade: true
+
+# Install required packages
+packages:
+  - git
+  - python3
+  - python3-pip
+  - python3-venv
+  - curl
+  - wget
+  - unzip
+  - jq
+  - vim
+  - openssh-server
+  - cloud-guest-utils
+
+# Run commands at boot
+runcmd:
+  # Disk expansion - ensure we use all allocated disk space
+  - growpart /dev/sda 3 || true
+  - pvresize /dev/sda3 || true
+  - lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv || true
+  - resize2fs /dev/ubuntu-vg/ubuntu-lv || true
+  # Network setup
+  - netplan apply
+  - systemctl restart systemd-networkd
+  # User setup - multiple attempts for reliability
+  - echo 'ubuntu:ubuntu123!' | chpasswd
+  - passwd -u ubuntu
+  - usermod -aG sudo ubuntu
+  - usermod -s /bin/bash ubuntu
+  - mkdir -p /home/ubuntu/.ssh
+  - chown ubuntu:ubuntu /home/ubuntu/.ssh
+  - chmod 700 /home/ubuntu/.ssh
+  # SSH setup
+  - systemctl enable ssh
+  - systemctl start ssh
+  - systemctl restart ssh
+  # Enable console login
+  - systemctl enable getty@tty1.service
+  - systemctl start getty@tty1.service
+  # Clone and setup WUG-Infoblox sync service
+  - cd /opt
+  - git clone https://github.com/bassslap/wug-infoblox-sync.git
+  - cd wug-infoblox-sync
+  - python3 -m venv .venv
+  - /opt/wug-infoblox-sync/.venv/bin/pip install --upgrade pip
+  - /opt/wug-infoblox-sync/.venv/bin/pip install -e .
+  - cp .env.example .env
+  - chown -R ubuntu:ubuntu /opt/wug-infoblox-sync
+  # Enable service (but don't start until .env is configured)
+  - systemctl daemon-reload
+  - systemctl enable wug-infoblox-sync.service
+  # Debug logging
+  - echo "WUG-Infoblox sync setup completed at $(date)" >> /var/log/setup-debug.log
+  - id ubuntu >> /var/log/setup-debug.log
+  - grep ubuntu /etc/passwd >> /var/log/setup-debug.log
+  - systemctl status ssh >> /var/log/setup-debug.log
+
+# SSH configuration
+ssh_deletekeys: false
+ssh_genkeytypes: ['rsa', 'ecdsa', 'ed25519']
+
+# Console access
+disable_root: false
+ssh_authorize_keys: true
+
+# Final message
+final_message: "***HEY-YOU!*** WUG-Infoblox Sync VM ready. Login: ubuntu/ubuntu123! Configure /opt/wug-infoblox-sync/.env and start service."
