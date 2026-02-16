@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wug-infoblox-sync"
+version = "0.1.0"
+description = "WhatsUp Gold to Infoblox IPAM sync bridge"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "Flask>=3.0.0",
+  "requests>=2.32.0",
+  "python-dotenv>=1.0.0"
+]
+
+[project.scripts]
+wug-infoblox-sync = "wug_infoblox_sync.app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

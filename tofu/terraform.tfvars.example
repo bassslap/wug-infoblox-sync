@@ -1,0 +1,6 @@
+infoblox_server   = "10.0.0.20"
+infoblox_username = "admin"
+infoblox_password = "change-me"
+network_view      = "default"
+cidr              = "10.10.20.0/24"
+fqdn              = "host1.lab.local"

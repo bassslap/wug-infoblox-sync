@@ -1,0 +1,6 @@
+{
+  "hostname_field_priority": ["displayName", "name"],
+  "ip_field_priority": ["networkAddress", "ipAddress", "primaryAddress"],
+  "status_field_priority": ["state", "status"],
+  "default_domain": "local"
+}
