@@ -1,0 +1,6 @@
+infoblox_server   = "10.100.0.14"
+infoblox_username = "admin"
+infoblox_password = "admin123!"
+network_view      = "default"
+cidr              = "10.100.0.0/14"
+fqdn              = "infoblox.local"

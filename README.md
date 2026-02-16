@@ -1,6 +1,6 @@
 # wug-infoblox-sync
 
-Minimal bridge service for syncing WhatsUp Gold devices into Infoblox IPAM host records, plus OpenTofu starter config for Infoblox IP allocation.
+Minimal bridge service for syncing WhatsUp Gold devices into Infoblox IPAM host records, plus Terraform/OpenTofu starter config for Infoblox IP allocation.
 
 ## What this includes
 
@@ -11,7 +11,7 @@ Minimal bridge service for syncing WhatsUp Gold devices into Infoblox IPAM host 
 - WUG API client with token auth and retry/backoff
 - Infoblox WAPI client with host record upsert
 - Mapping layer with extensible attributes for source parity (`WUG Device ID`, `WUG Status`)
-- OpenTofu starter under `tofu/`
+- Terraform/OpenTofu starter under `terraform/proxmox/` (add `terraform/aws/` and `terraform/azure/` later as needed)
 
 ## Quick start
 
@@ -31,13 +31,18 @@ curl -s -X POST http://localhost:8080/dry-run -H 'Content-Type: application/json
 curl -s -X POST http://localhost:8080/sync -H 'Content-Type: application/json' -d '{"limit": 25}'
 ```
 
-## OpenTofu usage
+## Terraform/OpenTofu usage
 
 ```bash
-cd tofu
+cd terraform/proxmox
 cp terraform.tfvars.example terraform.tfvars
 # edit values
 
+terraform init
+terraform plan
+terraform apply
+
+# or with OpenTofu
 tofu init
 tofu plan
 tofu apply
