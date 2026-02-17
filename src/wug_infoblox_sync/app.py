@@ -35,6 +35,22 @@ def create_app() -> Flask:
         result = service.run_sync(dry_run=True, limit=limit)
         return jsonify(SyncService.result_dict(result)), 200
 
+    @app.post("/reverse-sync")
+    def reverse_sync() -> tuple:
+        """Import devices from Infoblox into WhatsUp Gold"""
+        payload = request.get_json(silent=True) or {}
+        limit = payload.get("limit")
+        result = service.run_reverse_sync(dry_run=False, limit=limit)
+        return jsonify(SyncService.result_dict(result)), 200
+
+    @app.post("/reverse-dry-run")
+    def reverse_dry_run() -> tuple:
+        """Dry run of importing devices from Infoblox into WhatsUp Gold"""
+        payload = request.get_json(silent=True) or {}
+        limit = payload.get("limit")
+        result = service.run_reverse_sync(dry_run=True, limit=limit)
+        return jsonify(SyncService.result_dict(result)), 200
+
     return app
 
 

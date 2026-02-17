@@ -146,3 +146,116 @@ class WUGClient:
                 continue
         
         return all_devices
+
+    def device_exists(self, ip_address: str) -> bool:
+        """
+        Check if a device with the given IP address already exists in WUG.
+        """
+        devices = self.get_devices()
+        return any(d.ip_address == ip_address for d in devices)
+
+    def create_device(
+        self,
+        display_name: str,
+        ip_address: str,
+        hostname: str | None = None,
+        device_type: str = "Network Device",
+        primary_role: str = "Device",
+        poll_interval: int = 60,
+    ) -> dict[str, Any]:
+        """
+        Create a new device in WhatsUp Gold using the device template endpoint.
+        Based on the working implementation from netbox-wug-sync.
+        
+        Args:
+            display_name: Display name for the device
+            ip_address: IP address of the device
+            hostname: Hostname (optional, defaults to display_name)
+            device_type: Device type (optional)
+            primary_role: Primary role (optional)
+            poll_interval: Polling interval in seconds (optional)
+            
+        Returns:
+            Dictionary with creation result including device ID
+        """
+        token = self._token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        
+        if hostname is None:
+            hostname = display_name
+        
+        # Build device template payload based on WUG API schema
+        device_template = {
+            "displayName": display_name,
+            "deviceType": device_type,
+            "primaryRole": primary_role,
+            "pollIntervalSeconds": poll_interval,
+            "interfaces": [
+                {
+                    "defaultInterface": True,
+                    "pollUsingNetworkName": False,
+                    "networkAddress": ip_address,
+                    "networkName": hostname,
+                }
+            ],
+            "attributes": [],
+            "customLinks": [],
+            "activeMonitors": [{"classId": "", "Name": "Ping"}],
+            "performanceMonitors": [],
+            "passiveMonitors": [],
+            "dependencies": [],
+            "ncmTasks": [],
+            "applicationProfiles": [],
+            "layer2Data": "",
+            "groups": [],
+        }
+        
+        body = {"options": ["all"], "templates": [device_template]}
+        
+        base_url = self.settings.wug_base_url.rstrip('/')
+        endpoint = f"{base_url}/api/v1/devices/-/config/template"
+        
+        response = self.session.patch(
+            endpoint,
+            json=body,
+            headers=headers,
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        if data and "data" in data:
+            result_data = data["data"]
+            
+            # Check for errors
+            if "errors" in result_data and result_data["errors"]:
+                errors = result_data["errors"]
+                return {
+                    "success": False,
+                    "message": f"Device creation had errors: {errors}",
+                    "errors": errors,
+                }
+            
+            # Get device ID from response
+            if "idMap" in result_data and result_data["idMap"]:
+                device_id = result_data["idMap"][0].get("resultId")
+                return {
+                    "success": True,
+                    "device_id": device_id,
+                    "display_name": display_name,
+                    "ip_address": ip_address,
+                    "hostname": hostname,
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": "Device creation response missing device ID",
+                    "response_data": result_data,
+                }
+        else:
+            return {"success": False, "message": "Invalid API response format"}

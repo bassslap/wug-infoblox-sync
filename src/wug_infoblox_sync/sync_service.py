@@ -60,6 +60,106 @@ class SyncService:
             details=details,
         )
 
+    def run_reverse_sync(self, dry_run: bool, limit: int | None = None) -> SyncResult:
+        """
+        Reverse sync: Import devices from Infoblox into WhatsUp Gold.
+        
+        Args:
+            dry_run: If True, don't actually create devices in WUG
+            limit: Optional limit on number of records to process
+            
+        Returns:
+            SyncResult with details of import operation
+        """
+        # Get all host records from Infoblox
+        infoblox_records = self.infoblox_client.get_all_host_records(limit=limit)
+        details: list[dict[str, Any]] = []
+
+        processed = 0
+        created = 0
+        skipped = 0
+        errors = 0
+
+        for record in infoblox_records:
+            processed += 1
+            hostname = record.get("hostname", "")
+            ip_address = record.get("ip_address", "")
+            
+            if not hostname or not ip_address:
+                skipped += 1
+                details.append({
+                    "hostname": hostname or "unknown",
+                    "ip_address": ip_address or "unknown",
+                    "action": "skipped",
+                    "reason": "Missing hostname or IP address",
+                })
+                continue
+            
+            try:
+                # Check if device already exists in WUG
+                if self.wug_client.device_exists(ip_address):
+                    skipped += 1
+                    details.append({
+                        "hostname": hostname,
+                        "ip_address": ip_address,
+                        "action": "skipped",
+                        "reason": "Device already exists in WUG",
+                    })
+                    continue
+                
+                if dry_run:
+                    created += 1
+                    details.append({
+                        "hostname": hostname,
+                        "ip_address": ip_address,
+                        "action": "dry-run-create",
+                        "message": "Would create device in WUG",
+                    })
+                else:
+                    # Create device in WUG
+                    result = self.wug_client.create_device(
+                        display_name=hostname,
+                        ip_address=ip_address,
+                        hostname=hostname,
+                    )
+                    
+                    if result.get("success"):
+                        created += 1
+                        details.append({
+                            "hostname": hostname,
+                            "ip_address": ip_address,
+                            "action": "created",
+                            "device_id": result.get("device_id"),
+                            "message": "Successfully created in WUG",
+                        })
+                    else:
+                        errors += 1
+                        details.append({
+                            "hostname": hostname,
+                            "ip_address": ip_address,
+                            "action": "failed",
+                            "error": result.get("message", "Unknown error"),
+                        })
+                        
+            except Exception as exc:
+                errors += 1
+                details.append({
+                    "hostname": hostname,
+                    "ip_address": ip_address,
+                    "action": "failed",
+                    "error": str(exc),
+                })
+
+        return SyncResult(
+            discovered=len(infoblox_records),
+            processed=processed,
+            created_or_updated=created,
+            skipped=skipped,
+            errors=errors,
+            dry_run=dry_run,
+            details=details,
+        )
+
     @staticmethod
     def result_dict(result: SyncResult) -> dict[str, Any]:
         return asdict(result)

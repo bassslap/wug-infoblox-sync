@@ -93,3 +93,55 @@ class InfobloxClient:
             "ip_address": record.ip_address,
             "ref": create_response.json(),
         }
+
+    def get_all_host_records(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """
+        Get all host records from Infoblox.
+        
+        Args:
+            limit: Optional limit on number of records to return
+            
+        Returns:
+            List of host record dictionaries with name and ipv4addrs
+        """
+        query_url = f"{self._wapi_base()}/record:host"
+        query_params = {
+            "_return_fields": "name,ipv4addrs,extattrs,comment",
+            "_max_results": limit if limit else 1000,
+        }
+        
+        response = self.session.get(
+            query_url,
+            params=query_params,
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        records = response.json()
+        
+        if not isinstance(records, list):
+            return []
+        
+        # Transform records to simpler format
+        result = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            
+            name = record.get("name", "")
+            ipv4addrs = record.get("ipv4addrs", [])
+            
+            # Get first IP address
+            ip_address = ""
+            if ipv4addrs and isinstance(ipv4addrs, list) and len(ipv4addrs) > 0:
+                ip_address = ipv4addrs[0].get("ipv4addr", "")
+            
+            if name and ip_address:
+                result.append({
+                    "hostname": name,
+                    "ip_address": ip_address,
+                    "extattrs": record.get("extattrs", {}),
+                    "comment": record.get("comment", ""),
+                })
+        
+        return result
