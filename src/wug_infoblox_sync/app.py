@@ -163,11 +163,12 @@ def create_app() -> Flask:
 
     @app.post("/add-test-host")
     def add_test_host() -> tuple:
-        """Add a test host record to Infoblox"""
+        """Add a test host record to Infoblox and device to WUG"""
         payload = request.get_json(silent=True) or {}
         hostname = payload.get("hostname")
         ip_address = payload.get("ip_address")
         comment = payload.get("comment", "")
+        enable_monitoring = payload.get("enable_monitoring", True)
 
         if not hostname or not ip_address:
             return jsonify({"error": "hostname and ip_address are required"}), 400
@@ -189,27 +190,48 @@ def create_app() -> Flask:
             )
             
             # Add host record to Infoblox
-            result = infoblox_client.upsert_host_record(
+            infoblox_result = infoblox_client.upsert_host_record(
                 record=host_record,
                 dry_run=False
             )
             
+            # Also add device to WUG
+            wug_result = None
+            if wug_client.device_exists(ip_address):
+                wug_result = {
+                    "success": False,
+                    "message": f"Device with IP {ip_address} already exists in WUG",
+                    "skipped": True
+                }
+            else:
+                wug_result = wug_client.create_device(
+                    display_name=hostname,
+                    ip_address=ip_address,
+                    hostname=hostname,
+                    device_type="Server",
+                    primary_role="Server",
+                    poll_interval=300,
+                    enable_monitoring=enable_monitoring
+                )
+            
             return jsonify({
                 "success": True,
-                "message": f"Host record '{hostname}' added to Infoblox",
+                "message": f"Host '{hostname}' added to Infoblox and WUG",
                 "host": {
                     "hostname": hostname,
                     "ip_address": ip_address,
-                    "comment": comment
+                    "comment": comment,
+                    "monitoring_enabled": enable_monitoring
                 },
-                "infoblox_response": result
+                "infoblox_response": infoblox_result,
+                "wug_response": wug_result
             }), 201
 
         except Exception as e:
             logging.exception("Error adding test host")
             return jsonify({
                 "error": str(e),
-                "message": "Failed to add host record to Infoblox"
+                "message": "Failed to add host record to Infoblox and WUG"
             }), 500
 
     @app.post("/sync")

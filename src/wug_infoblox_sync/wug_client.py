@@ -162,6 +162,7 @@ class WUGClient:
         device_type: str = "Network Device",
         primary_role: str = "Device",
         poll_interval: int = 60,
+        enable_monitoring: bool = True,
     ) -> dict[str, Any]:
         """
         Create a new device in WhatsUp Gold using the device template endpoint.
@@ -174,6 +175,7 @@ class WUGClient:
             device_type: Device type (optional)
             primary_role: Primary role (optional)
             poll_interval: Polling interval in seconds (optional)
+            enable_monitoring: Whether to enable Ping monitoring (optional, default True)
             
         Returns:
             Dictionary with creation result including device ID
@@ -204,7 +206,7 @@ class WUGClient:
             ],
             "attributes": [],
             "customLinks": [],
-            "activeMonitors": [{"classId": "", "Name": "Ping"}],
+            "activeMonitors": [{"classId": "", "Name": "Ping"}] if enable_monitoring else [],
             "performanceMonitors": [],
             "passiveMonitors": [],
             "dependencies": [],

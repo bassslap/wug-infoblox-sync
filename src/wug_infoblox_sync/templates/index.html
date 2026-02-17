@@ -215,7 +215,7 @@
             <!-- Infoblox Side -->
             <div class="workflow-step">
                 <h2>Infoblox <span class="badge infoblox">SOURCE</span></h2>
-                <p>← Add host records to Infoblox, then import to WUG</p>
+                <p>← Add host records to Infoblox + WUG, then sync</p>
                 
                 <div class="form-group">
                     <label>Hostname (FQDN)</label>
@@ -229,8 +229,14 @@
                     <label>Comment (optional)</label>
                     <input type="text" id="host-comment" placeholder="Test server">
                 </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; cursor: pointer; user-select: none;">
+                        <input type="checkbox" id="host-enable-monitoring" checked style="width: auto; margin-right: 8px;">
+                        <span>Enable WUG Monitoring</span>
+                    </label>
+                </div>
                 
-                <button id="btn-add-host" onclick="addHostRecord()" style="width: 100%;">➕ Add to Infoblox</button>
+                <button id="btn-add-host" onclick="addHostRecord()" style="width: 100%;">➕ Add to Infoblox & WUG</button>
                 
                 <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
                 
@@ -448,6 +454,7 @@
             const name = document.getElementById('host-name').value.trim();
             const ip = document.getElementById('host-ip').value.trim();
             const comment = document.getElementById('host-comment').value.trim();
+            const enableMonitoring = document.getElementById('host-enable-monitoring').checked;
 
             if (!name || !ip) {
                 showResult('Please enter hostname and IP address', 'error');
@@ -463,7 +470,8 @@
                     body: JSON.stringify({
                         hostname: name,
                         ip_address: ip,
-                        comment: comment
+                        comment: comment,
+                        enable_monitoring: enableMonitoring
                     })
                 });
                 const data = await response.json();
