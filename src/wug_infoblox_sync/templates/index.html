@@ -274,7 +274,7 @@
         <!-- IPAM View -->
         <div class="card">
             <h2>📊 IP Address Management (IPAM) <button onclick="loadIPAMView()" class="secondary" style="padding: 6px 12px; margin-left: 10px; font-size: 12px;">🔄 Refresh</button></h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">Real-time view of all IP assignments in WUG and Infoblox</p>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">Real-time view of all IP assignments (auto-refreshes every 30 seconds, WUG queries take ~10-15 seconds)</p>
             
             <!-- IPAM Summary Stats -->
             <div class="stats" style="margin-bottom: 20px;">
@@ -513,69 +513,81 @@
             let wugIPs = new Set();
             let infobloxIPs = new Set();
             
-            // Load WUG devices
-            try {
-                const wugResponse = await fetch(`${API_BASE}/wug-devices?limit=1000`);
-                const wugData = await wugResponse.json();
-                
-                const wugContainer = document.getElementById('wug-devices');
-                const wugCount = document.getElementById('wug-count');
-                
-                if (wugData.success && wugData.devices.length > 0) {
-                    wugCount.textContent = wugData.count;
-                    wugContainer.innerHTML = wugData.devices.map(device => {
-                        wugIPs.add(device.ip_address);
-                        return `
-                            <div class="ipam-item">
-                                <div class="ipam-item-name">${device.name}</div>
-                                <div class="ipam-item-ip">🌐 ${device.ip_address}</div>
-                                <div class="ipam-item-host">📍 ${device.hostname}</div>
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    wugCount.textContent = '0';
-                    wugContainer.innerHTML = '<div class="empty-state">No devices found in WUG</div>';
-                }
-            } catch (error) {
-                document.getElementById('wug-devices').innerHTML = 
-                    `<div class="empty-state" style="color: #dc3545;">Error: ${error.message}</div>`;
-            }
+            // Set loading state
+            document.getElementById('wug-devices').innerHTML = '<div class="empty-state">⏳ Loading WUG devices (may take 10-15 seconds)...</div>';
+            document.getElementById('infoblox-hosts').innerHTML = '<div class="empty-state">⏳ Loading Infoblox hosts...</div>';
             
-            // Load Infoblox hosts
-            try {
-                const infobloxResponse = await fetch(`${API_BASE}/infoblox-hosts?limit=1000`);
-                const infobloxData = await infobloxResponse.json();
-                
-                const infobloxContainer = document.getElementById('infoblox-hosts');
-                const infobloxCount = document.getElementById('infoblox-count');
-                
-                if (infobloxData.success && infobloxData.hosts.length > 0) {
-                    infobloxCount.textContent = infobloxData.count;
-                    infobloxContainer.innerHTML = infobloxData.hosts.map(host => {
-                        infobloxIPs.add(host.ip_address);
-                        return `
-                            <div class="ipam-item infoblox">
-                                <div class="ipam-item-name">${host.name}</div>
-                                <div class="ipam-item-ip">🌐 ${host.ip_address}</div>
-                                ${host.comment ? `<div class="ipam-item-host">💬 ${host.comment}</div>` : ''}
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    infobloxCount.textContent = '0';
-                    infobloxContainer.innerHTML = '<div class="empty-state">No host records found in Infoblox</div>';
+            // Load both in parallel (Infoblox will load faster)
+            const wugPromise = (async () => {
+                try {
+                    const wugResponse = await fetch(`${API_BASE}/wug-devices?limit=1000`);
+                    const wugData = await wugResponse.json();
+                    
+                    const wugContainer = document.getElementById('wug-devices');
+                    const wugCount = document.getElementById('wug-count');
+                    
+                    if (wugData.success && wugData.devices.length > 0) {
+                        wugCount.textContent = wugData.count;
+                        wugContainer.innerHTML = wugData.devices.map(device => {
+                            wugIPs.add(device.ip_address);
+                            return `
+                                <div class="ipam-item">
+                                    <div class="ipam-item-name">${device.name}</div>
+                                    <div class="ipam-item-ip">🌐 ${device.ip_address}</div>
+                                    <div class="ipam-item-host">📍 ${device.hostname}</div>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        wugCount.textContent = '0';
+                        wugContainer.innerHTML = '<div class="empty-state">No devices found in WUG</div>';
+                    }
+                } catch (error) {
+                    document.getElementById('wug-devices').innerHTML = 
+                        `<div class="empty-state" style="color: #dc3545;">Error: ${error.message}</div>`;
                 }
-            } catch (error) {
-                document.getElementById('infoblox-hosts').innerHTML = 
-                    `<div class="empty-state" style="color: #dc3545;">Error: ${error.message}</div>`;
-            }
+                return wugIPs;
+            })();
+            
+            const infobloxPromise = (async () => {
+                try {
+                    const infobloxResponse = await fetch(`${API_BASE}/infoblox-hosts?limit=1000`);
+                    const infobloxData = await infobloxResponse.json();
+                    
+                    const infobloxContainer = document.getElementById('infoblox-hosts');
+                    const infobloxCount = document.getElementById('infoblox-count');
+                    
+                    if (infobloxData.success && infobloxData.hosts.length > 0) {
+                        infobloxCount.textContent = infobloxData.count;
+                        infobloxContainer.innerHTML = infobloxData.hosts.map(host => {
+                            infobloxIPs.add(host.ip_address);
+                            return `
+                                <div class="ipam-item infoblox">
+                                    <div class="ipam-item-name">${host.name}</div>
+                                    <div class="ipam-item-ip">🌐 ${host.ip_address}</div>
+                                    ${host.comment ? `<div class="ipam-item-host">💬 ${host.comment}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        infobloxCount.textContent = '0';
+                        infobloxContainer.innerHTML = '<div class="empty-state">No host records found in Infoblox</div>';
+                    }
+                } catch (error) {
+                    document.getElementById('infoblox-hosts').innerHTML = 
+                        `<div class="empty-state" style="color: #dc3545;">Error: ${error.message}</div>`;
+                }
+                return infobloxIPs;
+            })();
+            
+            // Wait for both to complete, then calculate stats
+            const [wugIPsResult, infobloxIPsResult] = await Promise.all([wugPromise, infobloxPromise]);
             
             // Calculate IPAM statistics
-            const allIPs = new Set([...wugIPs, ...infobloxIPs]);
-            const syncedIPs = new Set([...wugIPs].filter(ip => infobloxIPs.has(ip)));
-            const wugOnlyIPs = new Set([...wugIPs].filter(ip => !infobloxIPs.has(ip)));
-            const infobloxOnlyIPs = new Set([...infobloxIPs].filter(ip => !wugIPs.has(ip)));
+            const allIPs = new Set([...wugIPsResult, ...infobloxIPsResult]);
+            const syncedIPs = new Set([...wugIPsResult].filter(ip => infobloxIPsResult.has(ip)));
+            const wugOnlyIPs = new Set([...wugIPsResult].filter(ip => !infobloxIPsResult.has(ip)));
+            const infobloxOnlyIPs = new Set([...infobloxIPsResult].filter(ip => !wugIPsResult.has(ip)));
             
             document.getElementById('ipam-total-ips').textContent = allIPs.size;
             document.getElementById('ipam-wug-only').textContent = wugOnlyIPs.size;
@@ -587,9 +599,9 @@
         checkStatus();
         setInterval(checkStatus, 30000);
         
-        // Load IPAM view on page load and refresh every 10 seconds
+        // Load IPAM view on page load and refresh every 30 seconds
         loadIPAMView();
-        setInterval(loadIPAMView, 10000);
+        setInterval(loadIPAMView, 30000);
     </script>
 </body>
 </html>
