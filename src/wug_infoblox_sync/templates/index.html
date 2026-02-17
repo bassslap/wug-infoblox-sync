@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WUG-Infoblox Sync Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #333; margin-bottom: 30px; }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card h2 { color: #555; margin-bottom: 15px; font-size: 18px; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px 5px 5px 0;
+        }
+        button:hover { background: #0056b3; }
+        button.secondary { background: #6c757d; }
+        button.secondary:hover { background: #545b62; }
+        button.success { background: #28a745; }
+        button.success:hover { background: #218838; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #555; font-weight: 500; }
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .results {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .results h3 { color: #555; margin-bottom: 10px; }
+        .results pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .status { padding: 5px 10px; border-radius: 4px; display: inline-block; font-size: 12px; margin-left: 10px; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .loading { color: #666; font-style: italic; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value { font-size: 28px; font-weight: bold; color: #007bff; }
+        .stat-label { font-size: 12px; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 WUG-Infoblox Sync Dashboard</h1>
+        
+        <div class="cards">
+            <!-- Service Status -->
+            <div class="card">
+                <h2>📊 Service Status</h2>
+                <button onclick="checkStatus()">Check Status</button>
+                <div id="status-result"></div>
+            </div>
+
+            <!-- Add Test Device to WUG -->
+            <div class="card">
+                <h2>➕ Add Test Device to WUG</h2>
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="device-name" placeholder="Test Server 1">
+                </div>
+                <div class="form-group">
+                    <label>IP Address</label>
+                    <input type="text" id="device-ip" placeholder="10.100.1.100">
+                </div>
+                <div class="form-group">
+                    <label>Hostname (optional)</label>
+                    <input type="text" id="device-hostname" placeholder="server1.lab.local">
+                </div>
+                <button onclick="addDevice()">Add Device</button>
+                <button class="secondary" onclick="generateRandomDevice()">Random Device</button>
+            </div>
+
+            <!-- Sync Operations -->
+            <div class="card">
+                <h2>⚡ Sync Operations</h2>
+                <button onclick="runSync(false, 'dry-run')">Dry Run (WUG → Infoblox)</button>
+                <button class="success" onclick="runSync(false, 'sync')">Sync (WUG → Infoblox)</button>
+                <button onclick="runSync(true, 'reverse-dry-run')">Dry Run (Infoblox → WUG)</button>
+                <button class="success" onclick="runSync(true, 'reverse-sync')">Sync (Infoblox → WUG)</button>
+            </div>
+        </div>
+
+        <!-- Results Area -->
+        <div class="results" id="results" style="display: none;">
+            <h3>Results</h3>
+            <pre id="result-content"></pre>
+        </div>
+
+        <!-- Sync Statistics -->
+        <div class="card" style="margin-top: 20px;">
+            <h2>📈 Last Sync Statistics</h2>
+            <div class="stats" id="sync-stats">
+                <div class="stat">
+                    <div class="stat-value" id="stat-checked">-</div>
+                    <div class="stat-label">Devices Checked</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-synced">-</div>
+                    <div class="stat-label">Devices Synced</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-errors">-</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="stat-duration">-</div>
+                    <div class="stat-label">Duration (s)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+
+        function showResult(content, isError = false) {
+            const results = document.getElementById('results');
+            const resultContent = document.getElementById('result-content');
+            results.style.display = 'block';
+            
+            if (typeof content === 'object') {
+                resultContent.textContent = JSON.stringify(content, null, 2);
+                updateStats(content);
+            } else {
+                resultContent.textContent = content;
+            }
+        }
+
+        function updateStats(data) {
+            if (data.devices_checked !== undefined) {
+                document.getElementById('stat-checked').textContent = data.devices_checked;
+            }
+            if (data.devices_synced !== undefined) {
+                document.getElementById('stat-synced').textContent = data.devices_synced;
+            }
+            if (data.errors !== undefined) {
+                document.getElementById('stat-errors').textContent = data.errors;
+            }
+            if (data.duration !== undefined) {
+                document.getElementById('stat-duration').textContent = data.duration.toFixed(2);
+            }
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                document.getElementById('status-result').innerHTML = 
+                    `<span class="status success">✓ ${data.status.toUpperCase()}</span>`;
+                showResult(data);
+            } catch (error) {
+                document.getElementById('status-result').innerHTML = 
+                    `<span class="status error">✗ ERROR</span>`;
+                showResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        async function addDevice() {
+            const name = document.getElementById('device-name').value;
+            const ip = document.getElementById('device-ip').value;
+            const hostname = document.getElementById('device-hostname').value || `${name.toLowerCase().replace(/\s+/g, '-')}.lab.local`;
+
+            if (!name || !ip) {
+                alert('Please enter device name and IP address');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/add-test-device`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        display_name: name,
+                        ip_address: ip,
+                        hostname: hostname
+                    })
+                });
+                const data = await response.json();
+                showResult(data);
+                
+                if (response.ok) {
+                    // Clear form
+                    document.getElementById('device-name').value = '';
+                    document.getElementById('device-ip').value = '';
+                    document.getElementById('device-hostname').value = '';
+                }
+            } catch (error) {
+                showResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        function generateRandomDevice() {
+            const num = Math.floor(Math.random() * 1000);
+            const lastOctet = Math.floor(Math.random() * 250) + 1;
+            document.getElementById('device-name').value = `Test-Server-${num}`;
+            document.getElementById('device-ip').value = `10.100.1.${lastOctet}`;
+            document.getElementById('device-hostname').value = `test-server-${num}.lab.local`;
+        }
+
+        async function runSync(isReverse, endpoint) {
+            try {
+                const response = await fetch(`${API_BASE}/${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: 100 })
+                });
+                const data = await response.json();
+                showResult(data);
+            } catch (error) {
+                showResult(`Error: ${error.message}`, true);
+            }
+        }
+
+        // Check status on load
+        checkStatus();
+    </script>
+</body>
+</html>
