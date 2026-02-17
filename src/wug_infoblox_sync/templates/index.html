@@ -185,7 +185,7 @@
             <!-- WUG Side -->
             <div class="workflow-step">
                 <h2>WhatsUp Gold <span class="badge wug">SOURCE</span></h2>
-                <p>Add test devices to WUG, then sync them to Infoblox →</p>
+                <p>Add devices to WUG, then sync them to Infoblox →</p>
                 
                 <div class="form-group">
                     <label>Display Name</label>
@@ -200,12 +200,7 @@
                     <input type="text" id="device-hostname" placeholder="server1.lab.local">
                 </div>
                 
-                <div class="button-group">
-                    <button onclick="generateRandomDevice()" class="secondary">🎲 Random</button>
-                    <button id="btn-add" onclick="addDevice()">➕ Add to WUG</button>
-                </div>
-                
-                <div id="add-result"></div>
+                <button id="btn-add" onclick="addDevice()" style="width: 100%;">➕ Add to WUG</button>
                 
                 <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
                 
@@ -219,17 +214,25 @@
             
             <!-- Infoblox Side -->
             <div class="workflow-step">
-                <h2>Infoblox <span class="badge infoblox">TARGET</span></h2>
-                <p>← Import host records from Infoblox into WUG</p>
+                <h2>Infoblox <span class="badge infoblox">SOURCE</span></h2>
+                <p>← Add host records to Infoblox, then import to WUG</p>
                 
-                <div class="alert info" style="margin: 15px 0;">
-                    <strong>Mock Infoblox has 5 test records:</strong><br>
-                    • host1.example.com (192.168.1.10)<br>
-                    • host2.example.com (192.168.1.11)<br>
-                    • host3.example.com (192.168.1.12)<br>
-                    • server1.example.com (192.168.2.10)<br>
-                    • server2.example.com (192.168.2.11)
+                <div class="form-group">
+                    <label>Hostname (FQDN)</label>
+                    <input type="text" id="host-name" placeholder="server1.example.com">
                 </div>
+                <div class="form-group">
+                    <label>IP Address</label>
+                    <input type="text" id="host-ip" placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label>Comment (optional)</label>
+                    <input type="text" id="host-comment" placeholder="Test server">
+                </div>
+                
+                <button id="btn-add-host" onclick="addHostRecord()" style="width: 100%;">➕ Add to Infoblox</button>
+                
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
                 
                 <div class="button-group">
                     <button id="btn-reverse-dry" onclick="runSync('infoblox-to-wug', 'reverse-dry-run')">👁️ Preview Import</button>
@@ -410,6 +413,7 @@
                     document.getElementById('device-name').value = '';
                     document.getElementById('device-ip').value = '';
                     document.getElementById('device-hostname').value = '';
+                    loadIPAMView(); // Refresh IPAM view
                 }
             } catch (error) {
                 showResult(`Network error: ${error.message}`, 'error');
@@ -418,12 +422,42 @@
             }
         }
 
-        function generateRandomDevice() {
-            const num = Math.floor(Math.random() * 1000);
-            const lastOctet = Math.floor(Math.random() * 250) + 1;
-            document.getElementById('device-name').value = `Test-Server-${num}`;
-            document.getElementById('device-ip').value = `10.100.1.${lastOctet}`;
-            document.getElementById('device-hostname').value = `test-server-${num}.lab.local`;
+        async function addHostRecord() {
+            const name = document.getElementById('host-name').value.trim();
+            const ip = document.getElementById('host-ip').value.trim();
+            const comment = document.getElementById('host-comment').value.trim();
+
+            if (!name || !ip) {
+                showResult('Please enter hostname and IP address', 'error');
+                return;
+            }
+
+            setLoading('btn-add-host', true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/add-test-host`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        hostname: name,
+                        ip_address: ip,
+                        comment: comment
+                    })
+                });
+                const data = await response.json();
+                showResult(data, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    document.getElementById('host-name').value = '';
+                    document.getElementById('host-ip').value = '';
+                    document.getElementById('host-comment').value = '';
+                    loadIPAMView(); // Refresh IPAM view
+                }
+            } catch (error) {
+                showResult(`Network error: ${error.message}`, 'error');
+            } finally {
+                setLoading('btn-add-host', false);
+            }
         }
 
         async function runSync(direction, endpoint) {
@@ -445,6 +479,7 @@
                 });
                 const data = await response.json();
                 showResult(data);
+                loadIPAMView(); // Refresh IPAM view after sync
             } catch (error) {
                 showResult(`Network error: ${error.message}`, 'error');
             } finally {

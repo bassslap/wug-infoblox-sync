@@ -37,7 +37,10 @@ def create_app() -> Flask:
                 "POST /dry-run": "Dry run WUG to Infoblox sync (payload: {limit?: number})",
                 "POST /reverse-sync": "Sync Infoblox host records to WUG (payload: {limit?: number})",
                 "POST /reverse-dry-run": "Dry run Infoblox to WUG sync (payload: {limit?: number})",
-                "POST /add-test-device": "Add test device to WUG (payload: {display_name, ip_address, hostname?})"
+                "POST /add-test-device": "Add test device to WUG (payload: {display_name, ip_address, hostname?})",
+                "POST /add-test-host": "Add test host record to Infoblox (payload: {hostname, ip_address, comment?})",
+                "GET /wug-devices": "Get all devices from WUG",
+                "GET /infoblox-hosts": "Get all host records from Infoblox"
             }
         }), 200
 
@@ -156,6 +159,47 @@ def create_app() -> Flask:
             return jsonify({
                 "error": str(e),
                 "message": "Failed to add device to WUG"
+            }), 500
+
+    @app.post("/add-test-host")
+    def add_test_host() -> tuple:
+        """Add a test host record to Infoblox"""
+        payload = request.get_json(silent=True) or {}
+        hostname = payload.get("hostname")
+        ip_address = payload.get("ip_address")
+        comment = payload.get("comment", "")
+
+        if not hostname or not ip_address:
+            return jsonify({"error": "hostname and ip_address are required"}), 400
+
+        try:
+            # Add host record to Infoblox
+            result = infoblox_client.upsert_host_record(
+                hostname=hostname,
+                ip_address=ip_address,
+                extattrs={
+                    "Source": {"value": "Manual"},
+                    "Created": {"value": "Dashboard"}
+                },
+                comment=comment
+            )
+            
+            return jsonify({
+                "success": True,
+                "message": f"Host record '{hostname}' added to Infoblox",
+                "host": {
+                    "hostname": hostname,
+                    "ip_address": ip_address,
+                    "comment": comment
+                },
+                "infoblox_response": result
+            }), 201
+
+        except Exception as e:
+            logging.exception("Error adding test host")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to add host record to Infoblox"
             }), 500
 
     @app.post("/sync")
