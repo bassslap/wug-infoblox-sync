@@ -8,6 +8,7 @@ from .config import load_settings
 from .sync_service import SyncService
 from .wug_client import WUGClient
 from .infoblox_client import InfobloxClient
+from .models import InfobloxHostRecord
 
 
 def create_app() -> Flask:
@@ -173,15 +174,25 @@ def create_app() -> Flask:
             return jsonify({"error": "hostname and ip_address are required"}), 400
 
         try:
+            # Create InfobloxHostRecord object
+            extattrs = {
+                "Source": {"value": "Manual"},
+                "Created": {"value": "Dashboard"}
+            }
+            if comment:
+                extattrs["Comment"] = {"value": comment}
+            
+            host_record = InfobloxHostRecord(
+                fqdn=hostname,
+                ip_address=ip_address,
+                network_view="default",
+                extattrs=extattrs
+            )
+            
             # Add host record to Infoblox
             result = infoblox_client.upsert_host_record(
-                hostname=hostname,
-                ip_address=ip_address,
-                extattrs={
-                    "Source": {"value": "Manual"},
-                    "Created": {"value": "Dashboard"}
-                },
-                comment=comment
+                record=host_record,
+                dry_run=False
             )
             
             return jsonify({
