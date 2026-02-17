@@ -173,6 +173,9 @@ def create_app() -> Flask:
         if not hostname or not ip_address:
             return jsonify({"error": "hostname and ip_address are required"}), 400
 
+        infoblox_result = None
+        wug_result = None
+        
         try:
             # Create InfobloxHostRecord object
             extattrs = {
@@ -195,8 +198,15 @@ def create_app() -> Flask:
                 dry_run=False
             )
             
-            # Also add device to WUG
-            wug_result = None
+        except Exception as e:
+            logging.exception("Error adding host to Infoblox")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to add host record to Infoblox"
+            }), 500
+        
+        # Try to add device to WUG (don't fail if this times out)
+        try:
             if wug_client.device_exists(ip_address):
                 wug_result = {
                     "success": False,
@@ -213,26 +223,35 @@ def create_app() -> Flask:
                     poll_interval=300,
                     enable_monitoring=enable_monitoring
                 )
-            
-            return jsonify({
-                "success": True,
-                "message": f"Host '{hostname}' added to Infoblox and WUG",
-                "host": {
-                    "hostname": hostname,
-                    "ip_address": ip_address,
-                    "comment": comment,
-                    "monitoring_enabled": enable_monitoring
-                },
-                "infoblox_response": infoblox_result,
-                "wug_response": wug_result
-            }), 201
-
         except Exception as e:
-            logging.exception("Error adding test host")
-            return jsonify({
-                "error": str(e),
-                "message": "Failed to add host record to Infoblox and WUG"
-            }), 500
+            logging.exception("Error adding device to WUG")
+            wug_result = {
+                "success": False,
+                "message": f"WUG operation failed or timed out: {str(e)}",
+                "error": True
+            }
+        
+        # Build response
+        message = f"Host '{hostname}' added to Infoblox"
+        if wug_result and wug_result.get("success"):
+            message += " and WUG"
+        elif wug_result and wug_result.get("skipped"):
+            message += " (device already in WUG)"
+        elif wug_result and wug_result.get("error"):
+            message += " (WUG operation failed)"
+            
+        return jsonify({
+            "success": True,
+            "message": message,
+            "host": {
+                "hostname": hostname,
+                "ip_address": ip_address,
+                "comment": comment,
+                "monitoring_enabled": enable_monitoring
+            },
+            "infoblox_response": infoblox_result,
+            "wug_response": wug_result
+        }), 201
 
     @app.post("/sync")
     def sync() -> tuple:
