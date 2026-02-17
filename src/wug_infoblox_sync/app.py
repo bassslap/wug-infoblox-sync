@@ -233,16 +233,33 @@ def create_app() -> Flask:
         
         # Build response
         message = f"Host '{hostname}' added to Infoblox"
+        warning = None
+        
         if wug_result and wug_result.get("success"):
             message += " and WUG"
         elif wug_result and wug_result.get("skipped"):
             message += " (device already in WUG)"
         elif wug_result and wug_result.get("error"):
             message += " (WUG operation failed)"
+        elif wug_result and not wug_result.get("success"):
+            # Check for license error
+            wug_msg = wug_result.get("message", "")
+            if "License" in wug_msg or "maximum devices" in wug_msg:
+                warning = "⚠️ WUG License Limit: Cannot add more devices. Please remove unused devices or upgrade license."
+                message += " (WUG license limit reached)"
+            elif wug_result.get("errors"):
+                error_msgs = wug_result.get("errors", [])
+                if error_msgs:
+                    first_error = error_msgs[0].get("messages", ["Unknown error"])[0] if isinstance(error_msgs, list) else str(error_msgs)
+                    warning = f"⚠️ WUG Error: {first_error}"
+                message += " (WUG error - see details)"
+            else:
+                message += " (WUG operation failed)"
             
         return jsonify({
             "success": True,
             "message": message,
+            "warning": warning,
             "host": {
                 "hostname": hostname,
                 "ip_address": ip_address,

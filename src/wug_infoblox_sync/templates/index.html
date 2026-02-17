@@ -357,7 +357,12 @@
                 if (content.error) {
                     resultAlert.innerHTML = `<div class="alert error"><strong>Error:</strong> ${content.error}</div>`;
                 } else if (content.success !== undefined) {
-                    resultAlert.innerHTML = `<div class="alert ${content.success ? 'success' : 'error'}">${content.message || 'Operation completed'}</div>`;
+                    let alertHtml = `<div class="alert ${content.success ? 'success' : 'error'}">${content.message || 'Operation completed'}</div>`;
+                    // Add warning if present
+                    if (content.warning) {
+                        alertHtml += `<div class="alert error" style="margin-top: 10px;"><strong>Warning:</strong> ${content.warning}</div>`;
+                    }
+                    resultAlert.innerHTML = alertHtml;
                 } else {
                     const isDryRun = content.dry_run === true;
                     const synced = content.devices_synced || content.created_or_updated || 0;
