@@ -143,6 +143,37 @@
         }
         .badge.wug { background: #007bff; color: white; }
         .badge.infoblox { background: #28a745; color: white; }
+        .ipam-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .ipam-list {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        .ipam-item {
+            background: white;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+            font-size: 13px;
+        }
+        .ipam-item.infoblox { border-left-color: #28a745; }
+        .ipam-item-name { font-weight: 600; color: #333; }
+        .ipam-item-ip { color: #007bff; font-family: monospace; margin-top: 4px; }
+        .ipam-item-host { color: #666; font-size: 12px; margin-top: 2px; }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -233,6 +264,29 @@
                 <div class="stat">
                     <div class="stat-value" id="stat-duration">-</div>
                     <div class="stat-label">Duration (s)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IPAM View -->
+        <div class="card">
+            <h2>📊 Current IPAM State <button onclick="loadIPAMView()" class="secondary" style="padding: 6px 12px; margin-left: 10px; font-size: 12px;">🔄 Refresh</button></h2>
+            <div class="ipam-grid">
+                <div>
+                    <h3 style="color: #555; margin-bottom: 10px; font-size: 16px;">
+                        <span class="badge wug">WUG</span> Devices (<span id="wug-count">-</span>)
+                    </h3>
+                    <div class="ipam-list" id="wug-devices">
+                        <div class="empty-state">Click Refresh to load devices...</div>
+                    </div>
+                </div>
+                <div>
+                    <h3 style="color: #555; margin-bottom: 10px; font-size: 16px;">
+                        <span class="badge infoblox">Infoblox</span> Host Records (<span id="infoblox-count">-</span>)
+                    </h3>
+                    <div class="ipam-list" id="infoblox-hosts">
+                        <div class="empty-state">Click Refresh to load hosts...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -395,6 +449,60 @@
                 showResult(`Network error: ${error.message}`, 'error');
             } finally {
                 setLoading(btnId, false);
+            }
+        }
+
+        async function loadIPAMView() {
+            // Load WUG devices
+            try {
+                const wugResponse = await fetch(`${API_BASE}/wug-devices?limit=1000`);
+                const wugData = await wugResponse.json();
+                
+                const wugContainer = document.getElementById('wug-devices');
+                const wugCount = document.getElementById('wug-count');
+                
+                if (wugData.success && wugData.devices.length > 0) {
+                    wugCount.textContent = wugData.count;
+                    wugContainer.innerHTML = wugData.devices.map(device => `
+                        <div class="ipam-item">
+                            <div class="ipam-item-name">${device.name}</div>
+                            <div class="ipam-item-ip">🌐 ${device.ip_address}</div>
+                            <div class="ipam-item-host">📍 ${device.hostname}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    wugCount.textContent = '0';
+                    wugContainer.innerHTML = '<div class="empty-state">No devices found in WUG</div>';
+                }
+            } catch (error) {
+                document.getElementById('wug-devices').innerHTML = 
+                    `<div class="empty-state" style="color: #dc3545;">Error: ${error.message}</div>`;
+            }
+            
+            // Load Infoblox hosts
+            try {
+                const infobloxResponse = await fetch(`${API_BASE}/infoblox-hosts?limit=1000`);
+                const infobloxData = await infobloxResponse.json();
+                
+                const infobloxContainer = document.getElementById('infoblox-hosts');
+                const infobloxCount = document.getElementById('infoblox-count');
+                
+                if (infobloxData.success && infobloxData.hosts.length > 0) {
+                    infobloxCount.textContent = infobloxData.count;
+                    infobloxContainer.innerHTML = infobloxData.hosts.map(host => `
+                        <div class="ipam-item infoblox">
+                            <div class="ipam-item-name">${host.name}</div>
+                            <div class="ipam-item-ip">🌐 ${host.ip_address}</div>
+                            ${host.comment ? `<div class="ipam-item-host">💬 ${host.comment}</div>` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    infobloxCount.textContent = '0';
+                    infobloxContainer.innerHTML = '<div class="empty-state">No host records found in Infoblox</div>';
+                }
+            } catch (error) {
+                document.getElementById('infoblox-hosts').innerHTML = 
+                    `<div class="empty-state" style="color: #dc3545;">Error: ${error.message}</div>`;
             }
         }
 

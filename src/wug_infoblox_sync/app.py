@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from .config import load_settings
 from .sync_service import SyncService
 from .wug_client import WUGClient
+from .infoblox_client import InfobloxClient
 
 
 def create_app() -> Flask:
@@ -18,6 +19,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     service = SyncService(settings)
     wug_client = WUGClient(settings)
+    infoblox_client = InfobloxClient(settings)
 
     @app.get("/")
     def index():
@@ -42,6 +44,72 @@ def create_app() -> Flask:
     @app.get("/status")
     def status() -> tuple:
         return jsonify({"service": "wug-infoblox-sync", "status": "ok"}), 200
+
+    @app.get("/wug-devices")
+    def get_wug_devices() -> tuple:
+        """Get all devices from WUG"""
+        try:
+            limit = request.args.get("limit", type=int)
+            devices = wug_client.get_devices(limit=limit)
+            
+            # Format devices for display
+            device_list = []
+            for device in devices:
+                device_list.append({
+                    "id": device.get("id"),
+                    "name": device.get("displayName", device.get("name", "Unknown")),
+                    "ip_address": device.get("primaryAddress", device.get("ipAddress", "N/A")),
+                    "hostname": device.get("networkName", device.get("hostname", "N/A")),
+                    "device_type": device.get("deviceType", "Unknown"),
+                    "status": device.get("isUp", "Unknown")
+                })
+            
+            return jsonify({
+                "success": True,
+                "count": len(device_list),
+                "devices": device_list
+            }), 200
+            
+        except Exception as e:
+            logging.exception("Error fetching WUG devices")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch devices from WUG"
+            }), 500
+
+    @app.get("/infoblox-hosts")
+    def get_infoblox_hosts() -> tuple:
+        """Get all host records from Infoblox"""
+        try:
+            limit = request.args.get("limit", type=int, default=1000)
+            hosts = infoblox_client.get_all_host_records(limit=limit)
+            
+            # Format hosts for display
+            host_list = []
+            for host in hosts:
+                ipv4addrs = host.get("ipv4addrs", [])
+                ip = ipv4addrs[0].get("ipv4addr") if ipv4addrs else "N/A"
+                
+                host_list.append({
+                    "ref": host.get("_ref", ""),
+                    "name": host.get("name", "Unknown"),
+                    "ip_address": ip,
+                    "comment": host.get("comment", ""),
+                    "extattrs": host.get("extattrs", {})
+                })
+            
+            return jsonify({
+                "success": True,
+                "count": len(host_list),
+                "hosts": host_list
+            }), 200
+            
+        except Exception as e:
+            logging.exception("Error fetching Infoblox hosts")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch host records from Infoblox"
+            }), 500
 
     @app.post("/add-test-device")
     def add_test_device() -> tuple:
