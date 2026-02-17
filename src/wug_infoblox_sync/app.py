@@ -89,15 +89,14 @@ def create_app() -> Flask:
             hosts = infoblox_client.get_all_host_records(limit=limit)
             
             # Format hosts for display
+            # Note: get_all_host_records() transforms the API response:
+            # - "name" becomes "hostname"  
+            # - "ipv4addrs" becomes "ip_address"
             host_list = []
             for host in hosts:
-                ipv4addrs = host.get("ipv4addrs", [])
-                ip = ipv4addrs[0].get("ipv4addr") if ipv4addrs else "N/A"
-                
                 host_list.append({
-                    "ref": host.get("_ref", ""),
-                    "name": host.get("name", "Unknown"),
-                    "ip_address": ip,
+                    "name": host.get("hostname", "Unknown"),
+                    "ip_address": host.get("ip_address", "N/A"),
                     "comment": host.get("comment", ""),
                     "extattrs": host.get("extattrs", {})
                 })
