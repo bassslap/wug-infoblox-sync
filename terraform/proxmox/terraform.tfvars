@@ -16,7 +16,7 @@ storage_pool = "local-4tb"
 # Network configuration
 network_bridge  = "vmbr0"
 vlan_tag        = 0
-vm_ip_address   = "10.100.0.14"
+vm_ip_address   = "10.100.0.15"
 subnet_bits     = 14
 gateway         = "10.100.0.1"
 dns_servers     = ["8.8.8.8", "8.8.4.4"]

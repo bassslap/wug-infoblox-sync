@@ -17,6 +17,20 @@ def create_app() -> Flask:
     app = Flask(__name__)
     service = SyncService(settings)
 
+    @app.get("/")
+    def index() -> tuple:
+        return jsonify({
+            "service": "wug-infoblox-sync",
+            "version": "1.0.0",
+            "endpoints": {
+                "GET /status": "Health check",
+                "POST /sync": "Sync WUG devices to Infoblox (payload: {limit?: number})",
+                "POST /dry-run": "Dry run WUG to Infoblox sync (payload: {limit?: number})",
+                "POST /reverse-sync": "Sync Infoblox host records to WUG (payload: {limit?: number})",
+                "POST /reverse-dry-run": "Dry run Infoblox to WUG sync (payload: {limit?: number})"
+            }
+        }), 200
+
     @app.get("/status")
     def status() -> tuple:
         return jsonify({"service": "wug-infoblox-sync", "status": "ok"}), 200
