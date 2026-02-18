@@ -772,9 +772,10 @@ def create_app() -> Flask:
             # Add to Infoblox
             try:
                 host_record = InfobloxHostRecord(
-                    hostname=hostname,
+                    fqdn=hostname,
                     ip_address=ip_address,
-                    comment=payload.get("comment", f"Added via combined workflow")
+                    network_view="default",
+                    extattrs={"Comment": {"value": payload.get("comment", f"Added via combined workflow")}}
                 )
                 
                 infoblox_result = infoblox_client.upsert_host_record(host_record, dry_run=False)
