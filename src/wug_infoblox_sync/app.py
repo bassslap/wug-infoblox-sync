@@ -9,6 +9,7 @@ from .sync_service import SyncService
 from .wug_client import WUGClient
 from .infoblox_client import InfobloxClient
 from .models import InfobloxHostRecord
+from . import ip_utils
 
 
 def create_app() -> Flask:
@@ -49,7 +50,12 @@ def create_app() -> Flask:
                 "GET /infoblox/fixed-addresses": "Get all IPv4 fixed addresses from Infoblox",
                 "GET /infoblox/ranges": "Get all IPv4 DHCP ranges from Infoblox",
                 "GET /infoblox/alias-records": "Get all alias (CNAME) records from Infoblox",
-                "GET /infoblox/shared-networks": "Get all IPv4 shared networks from Infoblox"
+                "GET /infoblox/shared-networks": "Get all IPv4 shared networks from Infoblox",
+                "GET /infoblox/networks/<ref>/utilization": "Get IP utilization for network (query: ?network=192.168.1.0/24)",
+                "GET /infoblox/networks/<ref>/available-ips": "Get available IPs in network (query: ?network=192.168.1.0/24&limit=100)",
+                "GET /infoblox/networks/<ref>/next-available-ip": "Get next available IP in network (query: ?network=192.168.1.0/24)",
+                "POST /wug/device": "Create device in WUG (payload: {display_name, ip_address, hostname?, enable_monitoring?})",
+                "POST /combined/add-device": "Add device to Infoblox and optionally WUG (payload: {hostname, ip_address, network?, add_to_wug?, enable_monitoring?})"
             }
         }), 200
 
@@ -453,6 +459,389 @@ def create_app() -> Flask:
         limit = payload.get("limit")
         result = service.run_reverse_sync(dry_run=True, limit=limit)
         return jsonify(SyncService.result_dict(result)), 200
+
+    # IP Space Management Endpoints
+    
+    @app.get("/infoblox/networks/<network_ref>/utilization")
+    def get_network_utilization(network_ref: str) -> tuple:
+        """
+        Get IP utilization statistics for a specific network.
+        Query params:
+          - network: CIDR notation (e.g., 192.168.1.0/24)
+        """
+        try:
+            # Get network CIDR from query params or decode from ref
+            network_cidr = request.args.get("network")
+            if not network_cidr:
+                return jsonify({
+                    "error": "Missing 'network' query parameter",
+                    "message": "Please provide network in CIDR notation (e.g., ?network=192.168.1.0/24)"
+                }), 400
+            
+            if not ip_utils.validate_network(network_cidr):
+                return jsonify({
+                    "error": "Invalid network CIDR",
+                    "message": "Network must be in CIDR notation (e.g., 192.168.1.0/24)"
+                }), 400
+            
+            # Get all used IPs from Infoblox for this network
+            host_records = infoblox_client.get_all_host_records()
+            fixed_addresses = infoblox_client.get_fixed_addresses()
+            
+            used_ips = []
+            
+            # Extract IPs from host records
+            for record in host_records:
+                if "ipv4addrs" in record:
+                    for ipv4 in record["ipv4addrs"]:
+                        if "ipv4addr" in ipv4:
+                            ip = ipv4["ipv4addr"]
+                            if ip_utils.ip_in_network(ip, network_cidr):
+                                used_ips.append(ip)
+            
+            # Extract IPs from fixed addresses
+            for fixed in fixed_addresses:
+                if "ipv4addr" in fixed:
+                    ip = fixed["ipv4addr"]
+                    if ip_utils.ip_in_network(ip, network_cidr):
+                        used_ips.append(ip)
+            
+            # Calculate utilization
+            utilization = ip_utils.calculate_utilization(network_cidr, used_ips)
+            
+            return jsonify({
+                "success": True,
+                "utilization": utilization
+            }), 200
+            
+        except Exception as e:
+            logging.exception("Error calculating network utilization")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to calculate network utilization"
+            }), 500
+
+    @app.get("/infoblox/networks/<network_ref>/available-ips")
+    def get_available_ips(network_ref: str) -> tuple:
+        """
+        Get list of available IP addresses in a network.
+        Query params:
+          - network: CIDR notation (e.g., 192.168.1.0/24)
+          - limit: Max number of IPs to return (default: 100)
+        """
+        try:
+            network_cidr = request.args.get("network")
+            if not network_cidr:
+                return jsonify({
+                    "error": "Missing 'network' query parameter",
+                    "message": "Please provide network in CIDR notation (e.g., ?network=192.168.1.0/24)"
+                }), 400
+            
+            if not ip_utils.validate_network(network_cidr):
+                return jsonify({
+                    "error": "Invalid network CIDR",
+                    "message": "Network must be in CIDR notation (e.g., 192.168.1.0/24)"
+                }), 400
+            
+            limit = request.args.get("limit", type=int, default=100)
+            
+            # Get all used IPs from Infoblox for this network
+            host_records = infoblox_client.get_all_host_records()
+            fixed_addresses = infoblox_client.get_fixed_addresses()
+            
+            used_ips = []
+            
+            # Extract IPs from host records
+            for record in host_records:
+                if "ipv4addrs" in record:
+                    for ipv4 in record["ipv4addrs"]:
+                        if "ipv4addr" in ipv4:
+                            ip = ipv4["ipv4addr"]
+                            if ip_utils.ip_in_network(ip, network_cidr):
+                                used_ips.append(ip)
+            
+            # Extract IPs from fixed addresses
+            for fixed in fixed_addresses:
+                if "ipv4addr" in fixed:
+                    ip = fixed["ipv4addr"]
+                    if ip_utils.ip_in_network(ip, network_cidr):
+                        used_ips.append(ip)
+            
+            # Get available IPs
+            available = ip_utils.get_available_ips(network_cidr, used_ips, limit=limit)
+            
+            return jsonify({
+                "success": True,
+                "network": network_cidr,
+                "count": len(available),
+                "available_ips": available
+            }), 200
+            
+        except Exception as e:
+            logging.exception("Error fetching available IPs")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch available IPs"
+            }), 500
+
+    @app.get("/infoblox/networks/<network_ref>/next-available-ip")
+    def get_next_available_ip(network_ref: str) -> tuple:
+        """
+        Get the next available IP address in a network.
+        Query params:
+          - network: CIDR notation (e.g., 192.168.1.0/24)
+        """
+        try:
+            network_cidr = request.args.get("network")
+            if not network_cidr:
+                return jsonify({
+                    "error": "Missing 'network' query parameter",
+                    "message": "Please provide network in CIDR notation (e.g., ?network=192.168.1.0/24)"
+                }), 400
+            
+            if not ip_utils.validate_network(network_cidr):
+                return jsonify({
+                    "error": "Invalid network CIDR",
+                    "message": "Network must be in CIDR notation (e.g., 192.168.1.0/24)"
+                }), 400
+            
+            # Get all used IPs from Infoblox for this network
+            host_records = infoblox_client.get_all_host_records()
+            fixed_addresses = infoblox_client.get_fixed_addresses()
+            
+            used_ips = []
+            
+            # Extract IPs from host records
+            for record in host_records:
+                if "ipv4addrs" in record:
+                    for ipv4 in record["ipv4addrs"]:
+                        if "ipv4addr" in ipv4:
+                            ip = ipv4["ipv4addr"]
+                            if ip_utils.ip_in_network(ip, network_cidr):
+                                used_ips.append(ip)
+            
+            # Extract IPs from fixed addresses
+            for fixed in fixed_addresses:
+                if "ipv4addr" in fixed:
+                    ip = fixed["ipv4addr"]
+                    if ip_utils.ip_in_network(ip, network_cidr):
+                        used_ips.append(ip)
+            
+            # Get next available IP
+            next_ip = ip_utils.get_next_available_ip(network_cidr, used_ips)
+            
+            if next_ip:
+                return jsonify({
+                    "success": True,
+                    "network": network_cidr,
+                    "next_available_ip": next_ip
+                }), 200
+            else:
+                return jsonify({
+                    "success": False,
+                    "network": network_cidr,
+                    "message": "No available IPs in this network"
+                }), 404
+            
+        except Exception as e:
+            logging.exception("Error fetching next available IP")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch next available IP"
+            }), 500
+
+    # WUG Device Management Endpoints
+    
+    @app.post("/wug/device")
+    def create_wug_device() -> tuple:
+        """
+        Create a new device in WhatsUp Gold.
+        Payload: {
+          display_name: string,
+          ip_address: string,
+          hostname?: string,
+          device_type?: string,
+          primary_role?: string,
+          poll_interval?: number,
+          enable_monitoring?: boolean
+        }
+        """
+        try:
+            payload = request.get_json(silent=True) or {}
+            
+            # Validate required fields
+            display_name = payload.get("display_name")
+            ip_address = payload.get("ip_address")
+            
+            if not display_name or not ip_address:
+                return jsonify({
+                    "error": "Missing required fields",
+                    "message": "display_name and ip_address are required"
+                }), 400
+            
+            if not ip_utils.validate_ip(ip_address):
+                return jsonify({
+                    "error": "Invalid IP address",
+                    "message": "ip_address must be a valid IPv4 address"
+                }), 400
+            
+            # Check if device already exists
+            if wug_client.device_exists(ip_address):
+                return jsonify({
+                    "success": False,
+                    "message": f"Device with IP {ip_address} already exists in WUG"
+                }), 409
+            
+            # Create device in WUG
+            result = wug_client.create_device(
+                display_name=display_name,
+                ip_address=ip_address,
+                hostname=payload.get("hostname"),
+                device_type=payload.get("device_type", "Network Device"),
+                primary_role=payload.get("primary_role", "Device"),
+                poll_interval=payload.get("poll_interval", 60),
+                enable_monitoring=payload.get("enable_monitoring", True)
+            )
+            
+            if result.get("success"):
+                return jsonify(result), 201
+            else:
+                return jsonify(result), 400
+            
+        except Exception as e:
+            logging.exception("Error creating WUG device")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to create device in WUG"
+            }), 500
+
+    # Combined Workflow Endpoints
+    
+    @app.post("/combined/add-device")
+    def add_device_combined() -> tuple:
+        """
+        Add device to Infoblox and optionally to WUG in one operation.
+        Payload: {
+          hostname: string,
+          ip_address: string,
+          network: string (CIDR notation),
+          comment?: string,
+          add_to_wug?: boolean (default: false),
+          enable_monitoring?: boolean (default: true)
+        }
+        """
+        try:
+            payload = request.get_json(silent=True) or {}
+            
+            # Validate required fields
+            hostname = payload.get("hostname")
+            ip_address = payload.get("ip_address")
+            network_cidr = payload.get("network")
+            
+            if not hostname or not ip_address:
+                return jsonify({
+                    "error": "Missing required fields",
+                    "message": "hostname and ip_address are required"
+                }), 400
+            
+            if not ip_utils.validate_ip(ip_address):
+                return jsonify({
+                    "error": "Invalid IP address",
+                    "message": "ip_address must be a valid IPv4 address"
+                }), 400
+            
+            # Validate IP is in network if network is provided
+            if network_cidr:
+                if not ip_utils.validate_network(network_cidr):
+                    return jsonify({
+                        "error": "Invalid network CIDR",
+                        "message": "network must be in CIDR notation (e.g., 192.168.1.0/24)"
+                    }), 400
+                
+                if not ip_utils.ip_in_network(ip_address, network_cidr):
+                    return jsonify({
+                        "error": "IP not in network",
+                        "message": f"IP {ip_address} is not in network {network_cidr}"
+                    }), 400
+            
+            results = {
+                "infoblox": None,
+                "wug": None
+            }
+            
+            # Add to Infoblox
+            try:
+                host_record = InfobloxHostRecord(
+                    hostname=hostname,
+                    ip_address=ip_address,
+                    comment=payload.get("comment", f"Added via combined workflow")
+                )
+                
+                infoblox_result = infoblox_client.upsert_host_record(host_record, dry_run=False)
+                results["infoblox"] = {
+                    "success": True,
+                    "action": infoblox_result.get("action", "created"),
+                    "hostname": hostname,
+                    "ip_address": ip_address
+                }
+            except Exception as e:
+                results["infoblox"] = {
+                    "success": False,
+                    "error": str(e)
+                }
+                # If Infoblox fails, still try WUG if requested
+            
+            # Optionally add to WUG
+            add_to_wug = payload.get("add_to_wug", False)
+            if add_to_wug:
+                try:
+                    # Check if device already exists
+                    if wug_client.device_exists(ip_address):
+                        results["wug"] = {
+                            "success": False,
+                            "message": f"Device with IP {ip_address} already exists in WUG",
+                            "skipped": True
+                        }
+                    else:
+                        wug_result = wug_client.create_device(
+                            display_name=hostname,
+                            ip_address=ip_address,
+                            hostname=hostname,
+                            enable_monitoring=payload.get("enable_monitoring", True)
+                        )
+                        results["wug"] = wug_result
+                except Exception as e:
+                    results["wug"] = {
+                        "success": False,
+                        "error": str(e)
+                    }
+            else:
+                results["wug"] = {
+                    "skipped": True,
+                    "message": "WUG creation not requested (add_to_wug=false)"
+                }
+            
+            # Determine overall success
+            infoblox_success = results["infoblox"] and results["infoblox"].get("success", False)
+            wug_success = (
+                not add_to_wug or 
+                (results["wug"] and (results["wug"].get("success", False) or results["wug"].get("skipped", False)))
+            )
+            
+            overall_success = infoblox_success and wug_success
+            status_code = 201 if overall_success else 207  # 207 = Multi-Status
+            
+            return jsonify({
+                "success": overall_success,
+                "results": results
+            }), status_code
+            
+        except Exception as e:
+            logging.exception("Error in combined add device")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to add device"
+            }), 500
 
     return app
 
