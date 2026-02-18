@@ -114,6 +114,33 @@ def create_app() -> Flask:
                 "message": "Failed to fetch host records from Infoblox"
             }), 500
 
+    @app.delete("/infoblox-hosts/<hostname>")
+    def delete_infoblox_host(hostname: str) -> tuple:
+        """Delete a host record from Infoblox"""
+        try:
+            result = infoblox_client.delete_host_record(hostname)
+            
+            if result.get("success"):
+                return jsonify({
+                    "success": True,
+                    "message": result.get("message"),
+                    "hostname": hostname
+                }), 200
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": result.get("message"),
+                    "hostname": hostname
+                }), 404
+                
+        except Exception as e:
+            logging.exception(f"Error deleting host {hostname}")
+            return jsonify({
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to delete host record '{hostname}'"
+            }), 500
+
     @app.post("/add-test-device")
     def add_test_device() -> tuple:
         """Add a test device to WUG"""

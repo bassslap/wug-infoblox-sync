@@ -145,3 +145,59 @@ class InfobloxClient:
                 })
         
         return result
+
+    def delete_host_record(self, hostname: str) -> dict[str, Any]:
+        """
+        Delete a host record from Infoblox by hostname.
+        
+        Args:
+            hostname: The FQDN of the host to delete
+            
+        Returns:
+            Dictionary with deletion result
+        """
+        # First find the record to get its _ref
+        query_url = f"{self._wapi_base()}/record:host"
+        query_params = {
+            "name": hostname,
+            "_return_fields": "_ref,name",
+        }
+        
+        query_response = self.session.get(
+            query_url,
+            params=query_params,
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        query_response.raise_for_status()
+        existing = query_response.json()
+        
+        if not isinstance(existing, list) or not existing:
+            return {
+                "success": False,
+                "message": f"Host record '{hostname}' not found",
+            }
+        
+        # Get the _ref of the first matching record
+        ref = existing[0].get("_ref")
+        if not ref:
+            return {
+                "success": False,
+                "message": f"Host record '{hostname}' has no _ref",
+            }
+        
+        # Delete the record
+        delete_url = f"{self._wapi_base()}/{ref}"
+        delete_response = self.session.delete(
+            delete_url,
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        delete_response.raise_for_status()
+        
+        return {
+            "success": True,
+            "message": f"Host record '{hostname}' deleted successfully",
+            "hostname": hostname,
+            "ref": ref,
+        }
