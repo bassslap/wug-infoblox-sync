@@ -39,9 +39,17 @@ def create_app() -> Flask:
                 "POST /reverse-sync": "Sync Infoblox host records to WUG (payload: {limit?: number})",
                 "POST /reverse-dry-run": "Dry run Infoblox to WUG sync (payload: {limit?: number})",
                 "POST /add-test-device": "Add test device to WUG (payload: {display_name, ip_address, hostname?})",
-                "POST /add-test-host": "Add test host record to Infoblox (payload: {hostname, ip_address, comment?})",
+                "POST /add-test-host": "Add test host record to Infoblox and WUG (payload: {hostname, ip_address, comment?, enable_monitoring?})",
                 "GET /wug-devices": "Get all devices from WUG",
-                "GET /infoblox-hosts": "Get all host records from Infoblox"
+                "GET /infoblox-hosts": "Get all host records from Infoblox",
+                "DELETE /infoblox-hosts/<hostname>": "Delete a host record from Infoblox",
+                "GET /infoblox/network-views": "Get all network views from Infoblox",
+                "GET /infoblox/networks": "Get all IPv4 networks from Infoblox",
+                "GET /infoblox/network-containers": "Get all IPv4 network containers from Infoblox",
+                "GET /infoblox/fixed-addresses": "Get all IPv4 fixed addresses from Infoblox",
+                "GET /infoblox/ranges": "Get all IPv4 DHCP ranges from Infoblox",
+                "GET /infoblox/alias-records": "Get all alias (CNAME) records from Infoblox",
+                "GET /infoblox/shared-networks": "Get all IPv4 shared networks from Infoblox"
             }
         }), 200
 
@@ -139,6 +147,125 @@ def create_app() -> Flask:
                 "success": False,
                 "error": str(e),
                 "message": f"Failed to delete host record '{hostname}'"
+            }), 500
+
+    @app.get("/infoblox/network-views")
+    def get_network_views() -> tuple:
+        """Get all network views from Infoblox"""
+        try:
+            views = infoblox_client.get_network_views()
+            return jsonify({
+                "success": True,
+                "count": len(views),
+                "network_views": views
+            }), 200
+        except Exception as e:
+            logging.exception("Error fetching network views")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch network views from Infoblox"
+            }), 500
+
+    @app.get("/infoblox/networks")
+    def get_networks() -> tuple:
+        """Get all IPv4 networks from Infoblox"""
+        try:
+            networks = infoblox_client.get_ipv4_networks()
+            return jsonify({
+                "success": True,
+                "count": len(networks),
+                "networks": networks
+            }), 200
+        except Exception as e:
+            logging.exception("Error fetching networks")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch networks from Infoblox"
+            }), 500
+
+    @app.get("/infoblox/network-containers")
+    def get_network_containers() -> tuple:
+        """Get all IPv4 network containers from Infoblox"""
+        try:
+            containers = infoblox_client.get_ipv4_network_containers()
+            return jsonify({
+                "success": True,
+                "count": len(containers),
+                "network_containers": containers
+            }), 200
+        except Exception as e:
+            logging.exception("Error fetching network containers")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch network containers from Infoblox"
+            }), 500
+
+    @app.get("/infoblox/fixed-addresses")
+    def get_fixed_addresses() -> tuple:
+        """Get all IPv4 fixed addresses from Infoblox"""
+        try:
+            addresses = infoblox_client.get_fixed_addresses()
+            return jsonify({
+                "success": True,
+                "count": len(addresses),
+                "fixed_addresses": addresses
+            }), 200
+        except Exception as e:
+            logging.exception("Error fetching fixed addresses")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch fixed addresses from Infoblox"
+            }), 500
+
+    @app.get("/infoblox/ranges")
+    def get_ranges() -> tuple:
+        """Get all IPv4 ranges from Infoblox"""
+        try:
+            ranges = infoblox_client.get_ipv4_ranges()
+            return jsonify({
+                "success": True,
+                "count": len(ranges),
+                "ranges": ranges
+            }), 200
+        except Exception as e:
+            logging.exception("Error fetching ranges")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch ranges from Infoblox"
+            }), 500
+
+    @app.get("/infoblox/alias-records")
+    def get_alias_records() -> tuple:
+        """Get all alias (CNAME) records from Infoblox"""
+        try:
+            aliases = infoblox_client.get_alias_records()
+            return jsonify({
+                "success": True,
+                "count": len(aliases),
+                "alias_records": aliases
+            }), 200
+        except Exception as e:
+            logging.exception("Error fetching alias records")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch alias records from Infoblox"
+            }), 500
+
+    @app.get("/infoblox/shared-networks")
+    def get_shared_networks() -> tuple:
+        """Get all IPv4 shared networks from Infoblox"""
+        try:
+            shared_nets = infoblox_client.get_ipv4_shared_networks()
+            return jsonify({
+                "success": True,
+                "count": len(shared_nets),
+                "shared_networks": shared_nets
+            }), 200
+        except Exception as e:
+            logging.exception("Error fetching shared networks")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch shared networks from Infoblox"
             }), 500
 
     @app.post("/add-test-device")

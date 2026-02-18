@@ -201,3 +201,87 @@ class InfobloxClient:
             "hostname": hostname,
             "ref": ref,
         }
+
+    def get_network_views(self) -> list[dict[str, Any]]:
+        """Get all network views from Infoblox"""
+        url = f"{self._wapi_base()}/networkview"
+        response = self.session.get(
+            url,
+            params={"_return_fields": "name,is_default,comment"},
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_ipv4_networks(self) -> list[dict[str, Any]]:
+        """Get all IPv4 networks from Infoblox"""
+        url = f"{self._wapi_base()}/network"
+        response = self.session.get(
+            url,
+            params={"_return_fields": "network,network_view,comment,extattrs"},
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_ipv4_network_containers(self) -> list[dict[str, Any]]:
+        """Get all IPv4 network containers from Infoblox"""
+        url = f"{self._wapi_base()}/networkcontainer"
+        response = self.session.get(
+            url,
+            params={"_return_fields": "network,network_view,comment,extattrs"},
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_fixed_addresses(self) -> list[dict[str, Any]]:
+        """Get all IPv4 fixed addresses from Infoblox"""
+        url = f"{self._wapi_base()}/fixedaddress"
+        response = self.session.get(
+            url,
+            params={"_return_fields": "ipv4addr,network,network_view,mac,comment,extattrs"},
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_ipv4_ranges(self) -> list[dict[str, Any]]:
+        """Get all IPv4 ranges from Infoblox"""
+        url = f"{self._wapi_base()}/range"
+        response = self.session.get(
+            url,
+            params={"_return_fields": "start_addr,end_addr,network,network_view,comment,extattrs"},
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_alias_records(self) -> list[dict[str, Any]]:
+        """Get all CNAME (alias) records from Infoblox"""
+        url = f"{self._wapi_base()}/record:cname"
+        response = self.session.get(
+            url,
+            params={"_return_fields": "name,canonical,zone,comment"},
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_ipv4_shared_networks(self) -> list[dict[str, Any]]:
+        """Get all IPv4 shared networks from Infoblox"""
+        url = f"{self._wapi_base()}/sharednetwork"
+        response = self.session.get(
+            url,
+            params={"_return_fields": "name,network_view,networks,comment"},
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return response.json()

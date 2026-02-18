@@ -50,6 +50,109 @@ HOST_RECORDS = [
     }
 ]
 
+NETWORK_VIEWS = [
+    {
+        "_ref": "networkview/ZG5zLm5ldHdvcmtfdmlldyQw:default/true",
+        "name": "default",
+        "is_default": True,
+        "comment": "Default network view"
+    }
+]
+
+IPV4_NETWORKS = [
+    {
+        "_ref": "network/ZG5zLm5ldHdvcmskMTkyLjE2OC4xLjAvMjQvMA:192.168.1.0/24/default",
+        "network": "192.168.1.0/24",
+        "network_view": "default",
+        "comment": "Lab network 1",
+        "extattrs": {"Department": {"value": "IT"}}
+    },
+    {
+        "_ref": "network/ZG5zLm5ldHdvcmskMTkyLjE2OC4yLjAvMjQvMA:192.168.2.0/24/default",
+        "network": "192.168.2.0/24",
+        "network_view": "default",
+        "comment": "Lab network 2",
+        "extattrs": {"Department": {"value": "Operations"}}
+    },
+    {
+        "_ref": "network/ZG5zLm5ldHdvcmskMTAuMTAwLjAuMC8xNC8w:10.100.0.0/14/default",
+        "network": "10.100.0.0/14",
+        "network_view": "default",
+        "comment": "Production network",
+        "extattrs": {"Environment": {"value": "Production"}}
+    }
+]
+
+IPV4_NETWORK_CONTAINERS = [
+    {
+        "_ref": "networkcontainer/ZG5zLm5ldHdvcmtfY29udGFpbmVyJDEwLjAuMC4wLzgvMA:10.0.0.0/8/default",
+        "network": "10.0.0.0/8",
+        "network_view": "default",
+        "comment": "Private network container",
+        "extattrs": {"Type": {"value": "Private"}}
+    },
+    {
+        "_ref": "networkcontainer/ZG5zLm5ldHdvcmtfY29udGFpbmVyJDE5Mi4xNjguMC4wLzE2LzA:192.168.0.0/16/default",
+        "network": "192.168.0.0/16",
+        "network_view": "default",
+        "comment": "Lab network container",
+        "extattrs": {"Type": {"value": "Lab"}}
+    }
+]
+
+FIXED_ADDRESSES = [
+    {
+        "_ref": "fixedaddress/ZG5zLmZpeGVkX2FkZHJlc3MkMTkyLjE2OC4xLjEwMC4w:192.168.1.100/default",
+        "ipv4addr": "192.168.1.100",
+        "network": "192.168.1.0/24",
+        "network_view": "default",
+        "mac": "00:11:22:33:44:55",
+        "comment": "Printer 1",
+        "extattrs": {"DeviceType": {"value": "Printer"}}
+    },
+    {
+        "_ref": "fixedaddress/ZG5zLmZpeGVkX2FkZHJlc3MkMTkyLjE2OC4yLjEwMC4w:192.168.2.100/default",
+        "ipv4addr": "192.168.2.100",
+        "network": "192.168.2.0/24",
+        "network_view": "default",
+        "mac": "00:11:22:33:44:66",
+        "comment": "Access Point 1",
+        "extattrs": {"DeviceType": {"value": "WiFi AP"}}
+    }
+]
+
+IPV4_RANGES = [
+    {
+        "_ref": "range/ZG5zLnJhbmdlJDE5Mi4xNjguMS4yMDAuMTkyLjE2OC4xLjI1MC4w:192.168.1.200/192.168.1.250/default",
+        "start_addr": "192.168.1.200",
+        "end_addr": "192.168.1.250",
+        "network": "192.168.1.0/24",
+        "network_view": "default",
+        "comment": "DHCP range for lab devices",
+        "extattrs": {"Purpose": {"value": "DHCP"}}
+    }
+]
+
+ALIAS_RECORDS = [
+    {
+        "_ref": "record:cname/ZG5zLmNuYW1lJHd3dy5leGFtcGxlLmNvbS4w:www.example.com/default",
+        "name": "www.example.com",
+        "canonical": "server1.example.com",
+        "zone": "example.com",
+        "comment": "Web server alias"
+    }
+]
+
+IPV4_SHARED_NETWORKS = [
+    {
+        "_ref": "sharednetwork/ZG5zLnNoYXJlZF9uZXR3b3JrJGRlZmF1bHQuc2hhcmVkLW5ldC0x:shared-net-1/default",
+        "name": "shared-net-1",
+        "network_view": "default",
+        "networks": ["192.168.1.0/24", "192.168.2.0/24"],
+        "comment": "Shared lab networks"
+    }
+]
+
 # Basic auth check
 def check_auth(username, password):
     return username == "admin" and password == "admin123!"
@@ -158,6 +261,48 @@ def delete_host_record(ref):
             return jsonify(ref)
     
     return jsonify({"Error": "Record not found"}), 404
+
+@app.route('/wapi/v2.12.3/networkview', methods=['GET'])
+@requires_auth
+def get_network_views():
+    """Get network views"""
+    return jsonify(NETWORK_VIEWS)
+
+@app.route('/wapi/v2.12.3/network', methods=['GET'])
+@requires_auth
+def get_networks():
+    """Get IPv4 networks"""
+    return jsonify(IPV4_NETWORKS)
+
+@app.route('/wapi/v2.12.3/networkcontainer', methods=['GET'])
+@requires_auth
+def get_network_containers():
+    """Get IPv4 network containers"""
+    return jsonify(IPV4_NETWORK_CONTAINERS)
+
+@app.route('/wapi/v2.12.3/fixedaddress', methods=['GET'])
+@requires_auth
+def get_fixed_addresses():
+    """Get IPv4 fixed addresses"""
+    return jsonify(FIXED_ADDRESSES)
+
+@app.route('/wapi/v2.12.3/range', methods=['GET'])
+@requires_auth
+def get_ranges():
+    """Get IPv4 ranges"""
+    return jsonify(IPV4_RANGES)
+
+@app.route('/wapi/v2.12.3/record:cname', methods=['GET'])
+@requires_auth
+def get_cname_records():
+    """Get CNAME (alias) records"""
+    return jsonify(ALIAS_RECORDS)
+
+@app.route('/wapi/v2.12.3/sharednetwork', methods=['GET'])
+@requires_auth
+def get_shared_networks():
+    """Get IPv4 shared networks"""
+    return jsonify(IPV4_SHARED_NETWORKS)
 
 @app.route('/health', methods=['GET'])
 def health():
