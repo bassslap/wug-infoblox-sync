@@ -296,7 +296,7 @@
         <!-- IPAM View -->
         <div class="card">
             <h2>📊 IP Address Management (IPAM) <button onclick="loadIPAMView()" class="secondary" style="padding: 6px 12px; margin-left: 10px; font-size: 12px;">🔄 Refresh</button></h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">Real-time view of all IP assignments (auto-refreshes every 30 seconds, WUG queries take ~10-15 seconds)</p>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">Real-time view of all IP assignments (click Refresh button to update, WUG queries take ~10-15 seconds)</p>
             
             <!-- IPAM Summary Stats -->
             <div class="stats" style="margin-bottom: 20px;">
@@ -658,13 +658,15 @@
             document.getElementById('ipam-synced').textContent = syncedIPs.size;
         }
 
-        // Check status on load and every 30 seconds
+        // Check status on load
         checkStatus();
-        setInterval(checkStatus, 30000);
+        // Auto-refresh disabled - use manual refresh button
+        // setInterval(checkStatus, 30000);
         
-        // Load IPAM view on page load and refresh every 30 seconds
+        // Load IPAM view on page load
         loadIPAMView();
-        setInterval(loadIPAMView, 30000);
+        // Auto-refresh disabled - use manual refresh button
+        // setInterval(loadIPAMView, 30000);
     </script>
 </body>
 </html>
