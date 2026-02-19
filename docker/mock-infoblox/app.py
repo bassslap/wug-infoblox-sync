@@ -17,6 +17,7 @@ HOST_RECORDS = [
         "_ref": "record:host/ZG5zLmhvc3QkLl9kZWZhdWx0LmNvbS5leGFtcGxlLmhvc3Qx:host1.example.com/default",
         "name": "host1.example.com",
         "ipv4addrs": [{"ipv4addr": "192.168.1.10"}],
+        "view": "default",
         "extattrs": {"Site": {"value": "DC1"}},
         "comment": "Test host 1"
     },
@@ -24,6 +25,7 @@ HOST_RECORDS = [
         "_ref": "record:host/ZG5zLmhvc3QkLl9kZWZhdWx0LmNvbS5leGFtcGxlLmhvc3Qy:host2.example.com/default",
         "name": "host2.example.com",
         "ipv4addrs": [{"ipv4addr": "192.168.1.11"}],
+        "view": "default",
         "extattrs": {"Site": {"value": "DC1"}},
         "comment": "Test host 2"
     },
@@ -31,6 +33,7 @@ HOST_RECORDS = [
         "_ref": "record:host/ZG5zLmhvc3QkLl9kZWZhdWx0LmNvbS5leGFtcGxlLmhvc3Qz:host3.example.com/default",
         "name": "host3.example.com",
         "ipv4addrs": [{"ipv4addr": "192.168.1.12"}],
+        "view": "default",
         "extattrs": {"Site": {"value": "DC2"}},
         "comment": "Test host 3"
     },
@@ -38,6 +41,7 @@ HOST_RECORDS = [
         "_ref": "record:host/ZG5zLmhvc3QkLl9kZWZhdWx0LmNvbS5leGFtcGxlLnNlcnZlcjE:server1.example.com/default",
         "name": "server1.example.com",
         "ipv4addrs": [{"ipv4addr": "192.168.2.10"}],
+        "view": "default",
         "extattrs": {"Site": {"value": "DC1"}, "Environment": {"value": "Production"}},
         "comment": "Production server 1"
     },
@@ -45,6 +49,7 @@ HOST_RECORDS = [
         "_ref": "record:host/ZG5zLmhvc3QkLl9kZWZhdWx0LmNvbS5leGFtcGxlLnNlcnZlcjI:server2.example.com/default",
         "name": "server2.example.com",
         "ipv4addrs": [{"ipv4addr": "192.168.2.11"}],
+        "view": "default",
         "extattrs": {"Site": {"value": "DC2"}, "Environment": {"value": "Production"}},
         "comment": "Production server 2"
     }
@@ -56,6 +61,12 @@ NETWORK_VIEWS = [
         "name": "default",
         "is_default": True,
         "comment": "Default network view"
+    },
+    {
+        "_ref": "networkview/ZG5zLm5ldHdvcmtfdmlldyQx:My%20Network/false",
+        "name": "My Network",
+        "is_default": False,
+        "comment": "Custom network view for managed devices"
     }
 ]
 
@@ -207,22 +218,24 @@ def create_host_record():
     
     name = data.get('name')
     ipv4addrs = data.get('ipv4addrs', [])
+    network_view = data.get('view', 'default')  # Get network view from request
     
     if not name or not ipv4addrs:
         return jsonify({"Error": "name and ipv4addrs are required"}), 400
     
-    # Create new record
-    new_ref = f"record:host/ZG5zLmhvc3QkLl9kZWZhdWx0LmNvbS5leGFtcGxlLm5ldw:{name}/default"
+    # Create new record with the specified network view
+    new_ref = f"record:host/ZG5zLmhvc3QkLl9kZWZhdWx0LmNvbS5leGFtcGxlLm5ldw:{name}/{network_view}"
     new_record = {
         "_ref": new_ref,
         "name": name,
         "ipv4addrs": ipv4addrs,
+        "view": network_view,
         "extattrs": data.get('extattrs', {}),
         "comment": data.get('comment', '')
     }
     
     HOST_RECORDS.append(new_record)
-    app.logger.info(f"Created host record: {name}")
+    app.logger.info(f"Created host record: {name} in view: {network_view}")
     
     return jsonify(new_ref), 201
 
