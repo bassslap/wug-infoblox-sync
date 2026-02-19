@@ -323,6 +323,25 @@
                 <h3 style="color: #555; margin-bottom: 10px; font-size: 16px;">
                     🌐 IP Blocks / Networks (<span id="networks-count">0</span>)
                 </h3>
+                
+                <!-- Add Network Form -->
+                <details style="margin-bottom: 15px;">
+                    <summary style="cursor: pointer; color: #007bff; font-weight: 500; padding: 10px; background: #e7f3ff; border-radius: 4px; user-select: none;">
+                        ➕ Add New Network Block
+                    </summary>
+                    <div style="background: white; padding: 15px; margin-top: 10px; border-radius: 4px; border: 1px solid #ddd;">
+                        <div class="form-group">
+                            <label for="new-network-cidr">Network CIDR *</label>
+                            <input type="text" id="new-network-cidr" placeholder="e.g., 192.168.10.0/24" />
+                        </div>
+                        <div class="form-group">
+                            <label for="new-network-comment">Comment</label>
+                            <input type="text" id="new-network-comment" placeholder="e.g., Office Network - Floor 3" />
+                        </div>
+                        <button onclick="createNetwork()" id="create-network-btn" class="success">Create Network</button>
+                    </div>
+                </details>
+                
                 <div id="ip-blocks-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px;">
                     <div class="empty-state">Loading IP blocks...</div>
                 </div>
@@ -579,6 +598,47 @@
             }
         }
 
+        async function createNetwork() {
+            const cidr = document.getElementById('new-network-cidr').value.trim();
+            const comment = document.getElementById('new-network-comment').value.trim();
+            
+            if (!cidr) {
+                showResult('Please enter a network CIDR (e.g., 192.168.10.0/24)', 'error');
+                return;
+            }
+            
+            // Basic CIDR validation
+            const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+            if (!cidrRegex.test(cidr)) {
+                showResult('Invalid CIDR format. Example: 192.168.10.0/24', 'error');
+                return;
+            }
+            
+            setLoading('create-network-btn', true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/infoblox/network`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ network: cidr, comment })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult(`Network ${cidr} created successfully!`, 'success');
+                    document.getElementById('new-network-cidr').value = '';
+                    document.getElementById('new-network-comment').value = '';
+                    loadIPAMView(); // Refresh to show new network
+                } else {
+                    showResult(data.message || 'Failed to create network', 'error');
+                }
+            } catch (error) {
+                showResult(`Network error: ${error.message}`, 'error');
+            } finally {
+                setLoading('create-network-btn', false);
+            }
+        }
+
         async function loadIPAMView() {
             let wugIPs = new Set();
             let infobloxIPs = new Set();
@@ -588,9 +648,24 @@
             document.getElementById('infoblox-hosts').innerHTML = '<div class="empty-state">⏳ Loading Infoblox hosts...</div>';
             document.getElementById('ip-blocks-container').innerHTML = '<div class="empty-state">⏳ Loading IP blocks...</div>';
             
+            // Build IP->hostname map first
+            let ipHostnameMap = {};
+            
             // Load networks with utilization
             const networksPromise = (async () => {
                 try {
+                    // Get host records to map IPs to hostnames
+                    const hostsResponse = await fetch(`${API_BASE}/infoblox-hosts?limit=1000`);
+                    const hostsData = await hostsResponse.json();
+                    
+                    if (hostsData.success && hostsData.hosts) {
+                        hostsData.hosts.forEach(host => {
+                            if (host.ip_address) {
+                                ipHostnameMap[host.ip_address] = host.name;
+                            }
+                        });
+                    }
+                    
                     const response = await fetch(`${API_BASE}/infoblox/networks-with-utilization`);
                     const data = await response.json();
                     
@@ -628,7 +703,13 @@
                                                 📋 View ${allocatedIPs.length} allocated IP${allocatedIPs.length > 1 ? 's' : ''}
                                             </summary>
                                             <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; max-height: 150px; overflow-y: auto;">
-                                                ${allocatedIPs.map(ip => `<div style="font-size: 11px; color: #555; padding: 2px 0;">🌐 ${ip}</div>`).join('')}
+                                                ${allocatedIPs.map(ip => {
+                                                    const hostname = ipHostnameMap[ip];
+                                                    return `<div style="font-size: 11px; color: #555; padding: 2px 0; display: flex; justify-content: space-between;">
+                                                        <span>🌐 ${ip}</span>
+                                                        ${hostname ? `<span style="color: #007bff; margin-left: 10px;">📌 ${hostname}</span>` : ''}
+                                                    </div>`;
+                                                }).join('')}
                                             </div>
                                         </details>
                                     ` : '<div style="color: #999; font-size: 12px; font-style: italic;">No IPs allocated</div>'}

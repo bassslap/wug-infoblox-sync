@@ -285,3 +285,27 @@ class InfobloxClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def create_network(self, network_cidr: str, comment: str = "", network_view: str = "default") -> dict[str, Any]:
+        """Create a new IPv4 network in Infoblox"""
+        url = f"{self._wapi_base()}/network"
+        payload = {
+            "network": network_cidr,
+            "network_view": network_view
+        }
+        if comment:
+            payload["comment"] = comment
+        
+        response = self.session.post(
+            url,
+            json=payload,
+            timeout=self.settings.sync_timeout_seconds,
+            verify=self.settings.sync_verify_ssl,
+        )
+        response.raise_for_status()
+        return {
+            "success": True,
+            "ref": response.json(),
+            "network": network_cidr,
+            "comment": comment
+        }

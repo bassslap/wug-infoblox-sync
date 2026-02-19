@@ -47,6 +47,7 @@ def create_app() -> Flask:
                 "GET /infoblox/network-views": "Get all network views from Infoblox",
                 "GET /infoblox/networks": "Get all IPv4 networks from Infoblox",
                 "GET /infoblox/networks-with-utilization": "Get all networks with IP utilization and allocated IPs",
+                "POST /infoblox/network": "Create new network block (payload: {network: '192.168.10.0/24', comment?: 'description'})",
                 "GET /infoblox/network-containers": "Get all IPv4 network containers from Infoblox",
                 "GET /infoblox/fixed-addresses": "Get all IPv4 fixed addresses from Infoblox",
                 "GET /infoblox/ranges": "Get all IPv4 DHCP ranges from Infoblox",
@@ -257,6 +258,52 @@ def create_app() -> Flask:
             return jsonify({
                 "error": str(e),
                 "message": "Failed to fetch networks with utilization from Infoblox"
+            }), 500
+
+    @app.post("/infoblox/network")
+    def create_network() -> tuple:
+        """Create a new IPv4 network in Infoblox"""
+        try:
+            payload = request.get_json(silent=True) or {}
+            network = payload.get("network")
+            comment = payload.get("comment", "")
+            
+            if not network:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing required field",
+                    "message": "network field is required (e.g., '192.168.10.0/24')"
+                }), 400
+            
+            # Validate network CIDR
+            if not ip_utils.validate_network(network):
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid network CIDR",
+                    "message": "Network must be in valid CIDR notation (e.g., '192.168.10.0/24')"
+                }), 400
+            
+            result = infoblox_client.create_network(
+                network_cidr=network,
+                comment=comment
+            )
+            
+            return jsonify(result), 201
+            
+        except Exception as e:
+            logging.exception("Error creating network")
+            error_msg = str(e)
+            # Check for duplicate network error
+            if "already exists" in error_msg.lower() or "duplicate" in error_msg.lower():
+                return jsonify({
+                    "success": False,
+                    "error": "Network already exists",
+                    "message": f"Network {payload.get('network')} already exists in Infoblox"
+                }), 409
+            return jsonify({
+                "success": False,
+                "error": str(e),
+                "message": "Failed to create network in Infoblox"
             }), 500
 
     @app.get("/infoblox/network-containers")
