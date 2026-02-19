@@ -46,6 +46,7 @@ def create_app() -> Flask:
                 "DELETE /infoblox-hosts/<hostname>": "Delete a host record from Infoblox",
                 "GET /infoblox/network-views": "Get all network views from Infoblox",
                 "GET /infoblox/networks": "Get all IPv4 networks from Infoblox",
+                "GET /infoblox/networks-with-utilization": "Get all networks with IP utilization and allocated IPs",
                 "GET /infoblox/network-containers": "Get all IPv4 network containers from Infoblox",
                 "GET /infoblox/fixed-addresses": "Get all IPv4 fixed addresses from Infoblox",
                 "GET /infoblox/ranges": "Get all IPv4 DHCP ranges from Infoblox",
@@ -187,6 +188,75 @@ def create_app() -> Flask:
             return jsonify({
                 "error": str(e),
                 "message": "Failed to fetch networks from Infoblox"
+            }), 500
+
+    @app.get("/infoblox/networks-with-utilization")
+    def get_networks_with_utilization() -> tuple:
+        """Get all IPv4 networks from Infoblox with IP utilization data"""
+        try:
+            # Get all networks
+            networks = infoblox_client.get_ipv4_networks()
+            
+            # Get all used IPs
+            host_records = infoblox_client.get_all_host_records()
+            fixed_addresses = infoblox_client.get_fixed_addresses()
+            
+            # Build map of all used IPs
+            all_used_ips = []
+            
+            # Extract IPs from host records
+            for record in host_records:
+                if "ipv4addrs" in record:
+                    for ipv4 in record["ipv4addrs"]:
+                        if "ipv4addr" in ipv4:
+                            all_used_ips.append(ipv4["ipv4addr"])
+            
+            # Extract IPs from fixed addresses
+            for fixed in fixed_addresses:
+                if "ipv4addr" in fixed:
+                    all_used_ips.append(fixed["ipv4addr"])
+            
+            # Calculate utilization for each network
+            networks_with_util = []
+            for network in networks:
+                network_cidr = network.get("network")
+                if network_cidr and ip_utils.validate_network(network_cidr):
+                    # Filter used IPs to those in this network
+                    network_used_ips = [
+                        ip for ip in all_used_ips 
+                        if ip_utils.ip_in_network(ip, network_cidr)
+                    ]
+                    
+                    # Calculate utilization
+                    utilization = ip_utils.calculate_utilization(network_cidr, network_used_ips)
+                    
+                    # Combine network info with utilization
+                    network_with_util = {
+                        **network,
+                        "utilization": {
+                            "total_ips": utilization["total_ips"],
+                            "used_ips": utilization["used_ips"],
+                            "available_ips": utilization["available_ips"],
+                            "utilization_percent": utilization["utilization_percent"]
+                        },
+                        "allocated_ips": network_used_ips  # List of IPs in use
+                    }
+                    networks_with_util.append(network_with_util)
+                else:
+                    # Network without valid CIDR, add without utilization
+                    networks_with_util.append(network)
+            
+            return jsonify({
+                "success": True,
+                "count": len(networks_with_util),
+                "networks": networks_with_util
+            }), 200
+            
+        except Exception as e:
+            logging.exception("Error fetching networks with utilization")
+            return jsonify({
+                "error": str(e),
+                "message": "Failed to fetch networks with utilization from Infoblox"
             }), 500
 
     @app.get("/infoblox/network-containers")
