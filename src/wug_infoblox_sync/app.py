@@ -889,7 +889,7 @@ def create_app() -> Flask:
                 host_record = InfobloxHostRecord(
                     fqdn=hostname,
                     ip_address=ip_address,
-                    network_view="default",
+                    network_view=settings.infoblox_network_view,
                     extattrs={"Comment": {"value": payload.get("comment", f"Added via combined workflow")}}
                 )
                 

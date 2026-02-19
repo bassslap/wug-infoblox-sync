@@ -42,6 +42,6 @@ def load_settings() -> Settings:
         infoblox_wapi_version=os.getenv("INFOBLOX_WAPI_VERSION", "v2.12.3"),
         infoblox_username=os.getenv("INFOBLOX_USERNAME", ""),
         infoblox_password=os.getenv("INFOBLOX_PASSWORD", ""),
-        infoblox_network_view=os.getenv("INFOBLOX_NETWORK_VIEW", "default"),
+        infoblox_network_view=os.getenv("INFOBLOX_NETWORK_VIEW", "My Network"),
         infoblox_dry_run=_as_bool(os.getenv("INFOBLOX_DRY_RUN", "true"), True),
     )
