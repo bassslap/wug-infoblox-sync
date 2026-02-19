@@ -205,12 +205,10 @@ def create_app() -> Flask:
             # Build map of all used IPs
             all_used_ips = []
             
-            # Extract IPs from host records
+            # Extract IPs from host records (get_all_host_records transforms to ip_address field)
             for record in host_records:
-                if "ipv4addrs" in record:
-                    for ipv4 in record["ipv4addrs"]:
-                        if "ipv4addr" in ipv4:
-                            all_used_ips.append(ipv4["ipv4addr"])
+                if "ip_address" in record and record["ip_address"]:
+                    all_used_ips.append(record["ip_address"])
             
             # Extract IPs from fixed addresses
             for fixed in fixed_addresses:
