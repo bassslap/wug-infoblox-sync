@@ -268,11 +268,46 @@ def get_network_views():
     """Get network views"""
     return jsonify(NETWORK_VIEWS)
 
-@app.route('/wapi/v2.12.3/network', methods=['GET'])
+@app.route('/wapi/v2.12.3/network', methods=['GET', 'POST'])
 @requires_auth
-def get_networks():
-    """Get IPv4 networks"""
-    return jsonify(IPV4_NETWORKS)
+def networks():
+    """Get or create IPv4 networks"""
+    if request.method == 'POST':
+        # Create new network
+        data = request.get_json()
+        network_cidr = data.get('network')
+        comment = data.get('comment', '')
+        network_view = data.get('network_view', 'default')
+        
+        # Check if network already exists
+        if any(n['network'] == network_cidr for n in IPV4_NETWORKS):
+            return jsonify({
+                "Error": "AdmConDataError: None (IBDataConflictError: IB.Data.Conflict:The network already exists.)",
+                "code": "Client.Ibap.Data.Conflict",
+                "text": "The network already exists."
+            }), 400
+        
+        # Create network reference
+        import base64
+        ref_data = f"network${network_cidr}/{network_view}"
+        ref_b64 = base64.b64encode(ref_data.encode()).decode()
+        ref = f"network/{ref_b64}:{network_cidr}/{network_view}"
+        
+        # Add to networks list
+        new_network = {
+            "_ref": ref,
+            "network": network_cidr,
+            "network_view": network_view,
+            "comment": comment,
+            "extattrs": {}
+        }
+        IPV4_NETWORKS.append(new_network)
+        
+        # Return just the ref (standard Infoblox behavior)
+        return jsonify(ref), 201
+    else:
+        # GET - return all networks
+        return jsonify(IPV4_NETWORKS)
 
 @app.route('/wapi/v2.12.3/networkcontainer', methods=['GET'])
 @requires_auth
