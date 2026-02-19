@@ -201,29 +201,20 @@
             <!-- WUG Side -->
             <div class="workflow-step">
                 <h2>WhatsUp Gold <span class="badge wug">SOURCE</span></h2>
-                <p>Add devices to WUG, then sync them to Infoblox →</p>
+                <p>Sync devices from WUG to Infoblox IPAM →</p>
                 
-                <div class="form-group">
-                    <label>Display Name</label>
-                    <input type="text" id="device-name" placeholder="Test-Server-1">
-                </div>
-                <div class="form-group">
-                    <label>IP Address</label>
-                    <input type="text" id="device-ip" placeholder="10.100.1.100">
-                </div>
-                <div class="form-group">
-                    <label>Hostname</label>
-                    <input type="text" id="device-hostname" placeholder="server1.lab.local">
+                <div style="padding: 20px 0;">
+                    <button id="btn-sync" onclick="runSync('wug-to-infoblox', 'sync')" class="success" style="width: 100%; padding: 16px; font-size: 16px;">
+                        ▶️ Manual Sync WUG → Infoblox
+                    </button>
                 </div>
                 
-                <button id="btn-add" onclick="addDevice()" style="width: 100%;">➕ Add to WUG</button>
-                
-                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
-                
-                <div class="button-group">
-                    <button id="btn-dry" onclick="runSync('wug-to-infoblox', 'dry-run')">👁️ Preview Sync</button>
-                    <button id="btn-sync" onclick="runSync('wug-to-infoblox', 'sync')" class="success">▶️ Sync to Infoblox</button>
-                </div>
+                <details style="margin-top: 15px;">
+                    <summary style="cursor: pointer; color: #6c757d; font-size: 13px; user-select: none;">Advanced Options</summary>
+                    <div style="margin-top: 10px;">
+                        <button id="btn-dry" onclick="runSync('wug-to-infoblox', 'dry-run')" class="secondary" style="width: 100%;">👁️ Preview Sync (Dry Run)</button>
+                    </div>
+                </details>
             </div>
             
             <div class="workflow-arrow">⇄</div>
@@ -231,7 +222,7 @@
             <!-- Infoblox Side -->
             <div class="workflow-step">
                 <h2>Infoblox <span class="badge infoblox">SOURCE</span></h2>
-                <p>← Add host records to Infoblox + WUG, then sync</p>
+                <p>← Add host records to Infoblox + optionally WUG</p>
                 
                 <div class="form-group">
                     <label>Hostname (FQDN)</label>
@@ -455,48 +446,6 @@
                 document.getElementById('service-status').innerHTML = 
                     '<span style="color: #dc3545;">● Offline</span>';
                 console.error('Status check failed:', error);
-            }
-        }
-
-        async function addDevice() {
-            const name = document.getElementById('device-name').value.trim();
-            const ip = document.getElementById('device-ip').value.trim();
-            let hostname = document.getElementById('device-hostname').value.trim();
-
-            if (!name || !ip) {
-                showResult('Please enter device name and IP address', 'error');
-                return;
-            }
-
-            if (!hostname) {
-                hostname = `${name.toLowerCase().replace(/\s+/g, '-')}.lab.local`;
-            }
-
-            setLoading('btn-add', true);
-            
-            try {
-                const response = await fetch(`${API_BASE}/add-test-device`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        display_name: name,
-                        ip_address: ip,
-                        hostname: hostname
-                    })
-                });
-                const data = await response.json();
-                showResult(data, response.ok ? 'success' : 'error');
-                
-                if (response.ok) {
-                    document.getElementById('device-name').value = '';
-                    document.getElementById('device-ip').value = '';
-                    document.getElementById('device-hostname').value = '';
-                    loadIPAMView(); // Refresh IPAM view
-                }
-            } catch (error) {
-                showResult(`Network error: ${error.message}`, 'error');
-            } finally {
-                setLoading('btn-add', false);
             }
         }
 
