@@ -318,6 +318,16 @@
                 </div>
             </div>
             
+            <!-- IP Blocks / Networks Section -->
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #555; margin-bottom: 10px; font-size: 16px;">
+                    🌐 IP Blocks / Networks (<span id="networks-count">0</span>)
+                </h3>
+                <div id="ip-blocks-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px;">
+                    <div class="empty-state">Loading IP blocks...</div>
+                </div>
+            </div>
+            
             <div class="ipam-grid">
                 <div>
                     <h3 style="color: #555; margin-bottom: 10px; font-size: 16px;">
@@ -576,6 +586,64 @@
             // Set loading state
             document.getElementById('wug-devices').innerHTML = '<div class="empty-state">⏳ Loading WUG devices (may take 10-15 seconds)...</div>';
             document.getElementById('infoblox-hosts').innerHTML = '<div class="empty-state">⏳ Loading Infoblox hosts...</div>';
+            document.getElementById('ip-blocks-container').innerHTML = '<div class="empty-state">⏳ Loading IP blocks...</div>';
+            
+            // Load networks with utilization
+            const networksPromise = (async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/infoblox/networks-with-utilization`);
+                    const data = await response.json();
+                    
+                    const container = document.getElementById('ip-blocks-container');
+                    const count = document.getElementById('networks-count');
+                    
+                    if (data.success && data.networks.length > 0) {
+                        count.textContent = data.count;
+                        container.innerHTML = data.networks.map(network => {
+                            const util = network.utilization || {};
+                            const percentUsed = util.utilization_percent || 0;
+                            const usedIPs = util.used_ips || 0;
+                            const totalIPs = util.total_ips || 0;
+                            const allocatedIPs = network.allocated_ips || [];
+                            
+                            // Color code based on utilization
+                            let statusColor = '#28a745'; // green
+                            if (percentUsed > 80) statusColor = '#dc3545'; // red
+                            else if (percentUsed > 60) statusColor = '#ffc107'; // yellow
+                            
+                            return `
+                                <div style="background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid ${statusColor};">
+                                    <div style="font-weight: 600; color: #333; margin-bottom: 8px; font-size: 15px;">${network.network}</div>
+                                    ${network.comment ? `<div style="color: #666; font-size: 12px; margin-bottom: 8px;">💬 ${network.comment}</div>` : ''}
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px;">
+                                        <span style="color: #666;">Used: <strong style="color: ${statusColor};">${usedIPs}</strong> / ${totalIPs}</span>
+                                        <span style="color: #666; font-weight: 600;">${percentUsed.toFixed(1)}%</span>
+                                    </div>
+                                    <div style="background: #f0f0f0; border-radius: 4px; height: 8px; overflow: hidden; margin-bottom: 8px;">
+                                        <div style="background: ${statusColor}; width: ${percentUsed}%; height: 100%; transition: width 0.3s;"></div>
+                                    </div>
+                                    ${allocatedIPs.length > 0 ? `
+                                        <details style="margin-top: 10px;">
+                                            <summary style="cursor: pointer; color: #007bff; font-size: 12px; user-select: none;">
+                                                📋 View ${allocatedIPs.length} allocated IP${allocatedIPs.length > 1 ? 's' : ''}
+                                            </summary>
+                                            <div style="margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; max-height: 150px; overflow-y: auto;">
+                                                ${allocatedIPs.map(ip => `<div style="font-size: 11px; color: #555; padding: 2px 0;">🌐 ${ip}</div>`).join('')}
+                                            </div>
+                                        </details>
+                                    ` : '<div style="color: #999; font-size: 12px; font-style: italic;">No IPs allocated</div>'}
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        count.textContent = '0';
+                        container.innerHTML = '<div class="empty-state">No networks found</div>';
+                    }
+                } catch (error) {
+                    document.getElementById('ip-blocks-container').innerHTML = 
+                        `<div class="empty-state" style="color: #dc3545;">Error: ${error.message}</div>`;
+                }
+            })();
             
             // Load both in parallel (Infoblox will load faster)
             const wugPromise = (async () => {
@@ -644,7 +712,7 @@
             })();
             
             // Wait for both to complete, then calculate stats
-            const [wugIPsResult, infobloxIPsResult] = await Promise.all([wugPromise, infobloxPromise]);
+            const [wugIPsResult, infobloxIPsResult] = await Promise.all([wugPromise, infobloxPromise, networksPromise]);
             
             // Calculate IPAM statistics
             const allIPs = new Set([...wugIPsResult, ...infobloxIPsResult]);
