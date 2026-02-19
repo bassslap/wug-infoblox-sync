@@ -378,8 +378,8 @@ def create_app() -> Flask:
                     display_name=hostname,
                     ip_address=ip_address,
                     hostname=hostname,
-                    device_type="Server",
-                    primary_role="Server",
+                    device_type="Network Device",
+                    primary_role="Device",
                     poll_interval=300,
                     enable_monitoring=enable_monitoring
                 )
